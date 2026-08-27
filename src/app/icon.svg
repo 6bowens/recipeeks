@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#dc2626" />
+      <stop offset="50%" stop-color="#991b1b" />
+      <stop offset="100%" stop-color="#7f1d1d" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="url(#grad)" />
+  <!-- Chef Hat Icon -->
+  <path d="M11 22h10v2H11z" fill="#fecaca" />
+  <path d="M12 18h8v3h-8z" fill="#ffffff" />
+  <path d="M9.5 14.5a3.5 3.5 0 0 1 4.5-3.36 4.5 4.5 0 0 1 8 0 3.5 3.5 0 0 1 0 6.86H10a3.5 3.5 0 0 1-.5-3.5z" fill="#ffffff" />
+  <circle cx="22" cy="10" r="1.5" fill="#fde047" />
+</svg>

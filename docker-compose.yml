@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  recipeeks:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: recipeeks
+    restart: unless-stopped
+    ports:
+      - "6968:3000"
+    environment:
+      - DATABASE_URL=file:/app/data/recipeeks.db
+      - NEXTAUTH_SECRET=recipeeks-secret-key-brettflix-2026-prod
+      - NEXTAUTH_URL=http://localhost:6968
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=gemini-3.6-flash
+    volumes:
+      - ./data:/app/data
+
+volumes:
+  recipeeks_data:
+    driver: local

@@ -1,0 +1,118 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  password      String
+  name          String?
+  aiSpendUsd    Float          @default(0.0)
+  spendLimitUsd Float          @default(20.0)
+  adminNotified Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  cookbooks     Cookbook[]
+  pantryItems   PantryItem[]
+  scanSessions  ScanSession[]
+  aiLogs        AiUsageLog[]
+}
+
+model AiUsageLog {
+  id          String   @id @default(cuid())
+  actionType  String   // bookshelf_scan, recipe_index, index_ocr, fridge_scan, cover_gen
+  costUsd     Float    @default(0.0)
+  promptChars Int      @default(0)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Cookbook {
+  id             String    @id @default(cuid())
+  title          String
+  author         String?
+  edition        String?
+  coverColor     String?   @default("#dda031")
+  coverImageUrl  String?
+  spineSnippet   String?
+  verified       Boolean   @default(true)
+  totalRecipes   Int       @default(0)
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipes        Recipe[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Recipe {
+  id             String        @id @default(cuid())
+  title          String
+  pageNumber     Int?
+  isFact         Boolean       @default(true) // true if confirmed from verified index, false if inferred
+  servings       String?
+  prepTime       String?
+  cookTime       String?
+  category       String?       @default("Main")
+  sourceUrl      String?
+  cookbookId     String
+  cookbook       Cookbook      @relation(fields: [cookbookId], references: [id], onDelete: Cascade)
+  ingredients    Ingredient[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([cookbookId])
+}
+
+model Ingredient {
+  id             String    @id @default(cuid())
+  name           String
+  normalizedName String
+  amount         String?
+  unit           String?
+  optional       Boolean   @default(false)
+  recipeId       String
+  recipe         Recipe    @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([recipeId])
+  @@index([normalizedName])
+}
+
+model PantryItem {
+  id                String    @id @default(cuid())
+  name              String
+  normalizedName    String
+  category          String    @default("fridge") // fridge, freezer, pantry, spices
+  quantity          String?
+  unit              String?
+  isAlwaysAvailable Boolean   @default(false) // always-stocked staples (salt, pepper, olive oil, etc.)
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([normalizedName])
+}
+
+model ScanSession {
+  id             String    @id @default(cuid())
+  scanType       String    // bookshelf, fridge, pantry
+  imageUrl       String?
+  detectedCount  Int       @default(0)
+  rawOutput      String?
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
+
+  @@index([userId])
+}
