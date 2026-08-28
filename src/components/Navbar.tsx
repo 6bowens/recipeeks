@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -19,6 +19,7 @@ import {
   Zap,
   Shield,
   Wine,
+  ChevronDown,
 } from 'lucide-react';
 
 function NavbarContent() {
@@ -33,44 +34,12 @@ function NavbarContent() {
     totalVisionScans?: number;
   } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-
-  const isAdmin = session?.user?.email === '6bowens@gmail.com';
-
-  useEffect(() => {
-    if (session?.user) {
-      fetch('/api/cookbooks')
-        .then((res) => res.json())
-        .then((data) => {
-          if (data?.stats) {
-            setStats(data.stats);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [session, pathname]);
-
-  const handleExportCSV = async () => {
-    try {
-      setIsExporting(true);
-      const res = await fetch('/api/stats/export?format=csv');
-      if (!res.ok) throw new Error('Failed to export');
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `recipeeks-collection-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } catch (e) {
-      alert('Error exporting collection: ' + (e as Error).message);
-    } finally {
-      setIsExporting(false);
-    }
-  };
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const searchParams = useSearchParams();
+  const isAdmin = session?.user?.email === '6bowens@gmail.com';
   const isCocktails = pathname.startsWith('/cocktails');
   const cocktailTab = searchParams.get('tab') || 'bartender';
 
@@ -78,7 +47,6 @@ function NavbarContent() {
     { href: '/library', label: 'Library', icon: BookOpen },
     { href: '/pantry', label: 'Pantry & Fridge', icon: Layers },
     { href: '/match', label: 'Ready to Cook', icon: Sparkles, highlight: true },
-    ...(isAdmin ? [{ href: '/admin', label: 'Admin', icon: Shield }] : []),
   ];
 
   const cocktailNavLinks = [
@@ -100,7 +68,6 @@ function NavbarContent() {
       label: 'Back to Kitchen',
       icon: ChefHat,
     },
-    ...(isAdmin ? [{ href: '/admin', tabId: 'admin', label: 'Admin', icon: Shield }] : []),
   ];
 
   const activeLinks = isCocktails ? cocktailNavLinks : cookingNavLinks;
@@ -117,6 +84,41 @@ function NavbarContent() {
         .catch(() => {});
     }
   }, [session, pathname]);
+
+  // Click outside to close user dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    if (userMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userMenuOpen]);
+
+  const handleExportCSV = async () => {
+    try {
+      setIsExporting(true);
+      const res = await fetch('/api/stats/export?format=csv');
+      if (!res.ok) throw new Error('Failed to export');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recipeeks-collection-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      alert('Error exporting collection: ' + (e as Error).message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <header
@@ -221,39 +223,112 @@ function NavbarContent() {
                   <span>Spend: {stats.estimatedAiSpend}</span>
                 </div>
               )}
-
-              {/* Export Button */}
-              {session?.user && (
-                <button
-                  onClick={handleExportCSV}
-                  disabled={isExporting}
-                  title="Export collection to CSV"
-                  className="flex items-center gap-1 px-2.5 py-2 text-xs font-medium text-charcoal-500 hover:text-charcoal-900 hover:bg-charcoal-100 rounded-lg transition-colors ml-1"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span className="hidden xl:inline">Export</span>
-                </button>
-              )}
             </nav>
 
-            {/* Auth Buttons */}
+            {/* Auth / User Profile Button with Dropdown */}
             <div className="flex items-center gap-2">
               {status === 'loading' ? (
                 <div className="w-8 h-8 rounded-full bg-charcoal-100 animate-pulse" />
               ) : session?.user ? (
-                <div className="flex items-center gap-2 pl-2 border-l border-charcoal-200">
-                  <div className="w-8 h-8 rounded-full bg-red-100 text-red-900 font-bold text-xs flex items-center justify-center border border-red-200">
-                    {session.user.name?.[0]?.toUpperCase() ||
-                      session.user.email?.[0]?.toUpperCase() ||
-                      'U'}
-                  </div>
+                <div className="relative" ref={userMenuRef}>
                   <button
-                    onClick={() => signOut({ callbackUrl: '/login' })}
-                    title="Sign Out"
-                    className="p-1.5 text-charcoal-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className={`flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-xl transition-all border cursor-pointer ${
+                      isCocktails
+                        ? 'bg-[#161a22] hover:bg-[#1f2430] border-amber-900/40 text-amber-200 shadow-sm'
+                        : 'bg-charcoal-50 hover:bg-charcoal-100 border-charcoal-200/80 text-charcoal-800'
+                    }`}
                   >
-                    <LogOut className="w-4 h-4" />
+                    <div
+                      className={`w-7 h-7 rounded-lg font-bold text-xs flex items-center justify-center shadow-xs ${
+                        isCocktails
+                          ? 'bg-amber-500 text-charcoal-950'
+                          : 'bg-red-800 text-white'
+                      }`}
+                    >
+                      {session.user.name?.[0]?.toUpperCase() ||
+                        session.user.email?.[0]?.toUpperCase() ||
+                        'U'}
+                    </div>
+                    <span className="hidden sm:inline text-xs font-semibold max-w-[110px] truncate">
+                      {session.user.name || session.user.email?.split('@')[0]}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 opacity-60" />
                   </button>
+
+                  {/* Dropdown Menu */}
+                  {userMenuOpen && (
+                    <div
+                      className={`absolute right-0 mt-2 w-64 rounded-2xl shadow-2xl border p-2 z-50 animate-in fade-in zoom-in-95 ${
+                        isCocktails
+                          ? 'bg-[#13161c] border-amber-900/40 text-white shadow-black/80'
+                          : 'bg-white border-charcoal-200 text-charcoal-800'
+                      }`}
+                    >
+                      <div className={`p-3 border-b mb-1 ${isCocktails ? 'border-white/10' : 'border-charcoal-100'}`}>
+                        <p className="font-bold text-xs truncate">
+                          {session.user.name || 'User'}
+                        </p>
+                        <p className="text-[11px] text-charcoal-400 truncate mt-0.5">
+                          {session.user.email}
+                        </p>
+                        {stats?.estimatedAiSpend && (
+                          <div className="mt-2 text-[11px] font-semibold flex items-center gap-1 text-emerald-500">
+                            <Zap className="w-3 h-3 fill-emerald-500" />
+                            <span>AI Spend: {stats.estimatedAiSpend}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        {isAdmin && (
+                          <Link
+                            href="/admin"
+                            onClick={() => setUserMenuOpen(false)}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                              isCocktails
+                                ? 'hover:bg-amber-500/10 text-amber-300'
+                                : 'hover:bg-red-50 text-red-700'
+                            }`}
+                          >
+                            <Shield className="w-4 h-4 text-amber-400" />
+                            <div className="flex-1 flex items-center justify-between">
+                              <span>Admin Dashboard</span>
+                              <span className="text-[9px] bg-red-950 text-red-200 border border-red-800/60 px-1.5 py-0.2 rounded font-mono font-bold">
+                                Admin
+                              </span>
+                            </div>
+                          </Link>
+                        )}
+
+                        <button
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            handleExportCSV();
+                          }}
+                          disabled={isExporting}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                            isCocktails
+                              ? 'hover:bg-white/5 text-charcoal-300'
+                              : 'hover:bg-charcoal-100 text-charcoal-700'
+                          }`}
+                        >
+                          <Download className="w-4 h-4 text-charcoal-400" />
+                          <span>{isExporting ? 'Exporting...' : 'Export Collection (CSV)'}</span>
+                        </button>
+
+                        <div className={`border-t my-1 ${isCocktails ? 'border-white/10' : 'border-charcoal-100'}`} />
+
+                        <button
+                          onClick={() => signOut({ callbackUrl: '/login' })}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                        >
+                          <LogOut className="w-4 h-4 text-red-500" />
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
@@ -318,6 +393,20 @@ function NavbarContent() {
                 </Link>
               );
             })}
+
+            {isAdmin && (
+              <Link
+                href="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium ${
+                  isCocktails ? 'text-amber-300 hover:bg-white/5' : 'text-red-700 hover:bg-red-50'
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                <span>Admin Dashboard</span>
+              </Link>
+            )}
+
             {stats?.estimatedAiSpend && (
               <div className="px-3 py-2 text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
                 <Zap className="w-3.5 h-3.5 text-emerald-600" /> AI Spend: {stats.estimatedAiSpend}
