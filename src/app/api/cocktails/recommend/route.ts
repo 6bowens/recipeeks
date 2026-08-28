@@ -16,6 +16,7 @@ export interface CocktailRecommendationResult {
   pageNumber?: number | null;
   spiritBase: string;
   flavorProfile: string;
+  complexity?: string;
   glassware: string;
   ice?: string;
   technique?: string;
@@ -149,8 +150,8 @@ export async function POST(req: Request) {
     // Sort Tier 1 matches by highest match score
     libraryMatches.sort((a, b) => b.matchScore - a.matchScore);
 
-    // 3. TIER 2: Curated Classic & Modern Web Speakeasy Database
-    const formatClassic = (classic: typeof CLASSIC_COCKTAILS[0]) => {
+    // 3. TIER 2: Curated Classic & Modern Web Speakeasy Database strictly aligned with survey inputs
+    const formatClassic = (classic: ClassicCocktailSpec): CocktailRecommendationResult => {
       const matched: string[] = [];
       const missing: string[] = [];
 
@@ -176,7 +177,8 @@ export async function POST(req: Request) {
         name: classic.name,
         source: 'web_classic' as const,
         spiritBase: classic.spiritBase,
-        flavorProfile: classic.flavorProfile,
+        flavorProfile: classic.flavorProfiles[0] || 'balanced',
+        complexity: classic.complexity,
         glassware: classic.glassware,
         ice: classic.ice,
         technique: classic.technique,
@@ -190,52 +192,90 @@ export async function POST(req: Request) {
       };
     };
 
-    const directMatches = CLASSIC_COCKTAILS.filter((classic) => {
-      if (spiritBase && spiritBase !== 'Any') {
-        const target = spiritBase.toLowerCase();
-        if (!classic.spiritBase.toLowerCase().includes(target) && !classic.name.toLowerCase().includes(target)) {
-          return false;
-        }
-      }
-      if (flavorProfile && flavorProfile !== 'Any') {
-        if (classic.flavorProfile !== flavorProfile.toLowerCase()) {
-          return false;
-        }
-      }
-      return true;
-    }).map(formatClassic);
+    const targetSpirit = (spiritBase && spiritBase !== 'Any') ? spiritBase.toLowerCase() : null;
+    const targetFlavor = (flavorProfile && flavorProfile !== 'Any') ? flavorProfile.toLowerCase() : null;
+    const targetComplexity = (complexity && complexity !== 'Any') ? complexity.toLowerCase() : null;
 
-    // If fewer than 4 direct matches, expand with same-spirit or high-match classics
-    const addedIds = new Set(directMatches.map((m) => m.id));
-    const secondaryMatches: CocktailRecommendationResult[] = [];
+    const matchesSpiritBase = (classic: ClassicCocktailSpec) => {
+      if (!targetSpirit) return true;
+      const base = classic.spiritBase.toLowerCase();
+      // Handle combined categories like "Bourbon / Rye", "Tequila / Mezcal", "Amaro / Spritz"
+      if (base.includes(targetSpirit) || targetSpirit.includes(base)) return true;
+      if (targetSpirit.includes('tequila') && base.includes('mezcal')) return true;
+      if (targetSpirit.includes('whiskey') && (base.includes('bourbon') || base.includes('rye'))) return true;
+      return false;
+    };
+
+    const matchesFlavor = (classic: ClassicCocktailSpec) => {
+      if (!targetFlavor) return true;
+      return classic.flavorProfiles.some((f) => f.toLowerCase() === targetFlavor);
+    };
+
+    const matchesComplexity = (classic: ClassicCocktailSpec) => {
+      if (!targetComplexity) return true;
+      return classic.complexity.toLowerCase() === targetComplexity;
+    };
+
+    // Level 1: Exact Spirit + Exact Flavor + Exact Complexity (Top Tier Survey Alignment)
+    const exactMatches: ClassicCocktailSpec[] = [];
+    // Level 2: Exact Spirit + Exact Flavor
+    const flavorMatches: ClassicCocktailSpec[] = [];
+    // Level 3: Exact Spirit (same spirit base)
+    const spiritMatches: ClassicCocktailSpec[] = [];
+    // Level 4: (Only if spirit is "Any") Exact Flavor across any spirit
+    const fallbackFlavorMatches: ClassicCocktailSpec[] = [];
+
+    const seenIds = new Set<string>();
 
     for (const classic of CLASSIC_COCKTAILS) {
-      if (addedIds.has(`web-${classic.id}`)) continue;
-      if (spiritBase && spiritBase !== 'Any') {
-        const target = spiritBase.toLowerCase();
-        if (classic.spiritBase.toLowerCase().includes(target) || classic.name.toLowerCase().includes(target)) {
-          secondaryMatches.push(formatClassic(classic));
-          addedIds.add(`web-${classic.id}`);
+      if (matchesSpiritBase(classic)) {
+        if (matchesFlavor(classic) && matchesComplexity(classic)) {
+          exactMatches.push(classic);
+          seenIds.add(classic.id);
+        } else if (matchesFlavor(classic)) {
+          flavorMatches.push(classic);
+          seenIds.add(classic.id);
+        } else if (targetSpirit) {
+          // Only add to spiritMatches if a spirit was explicitly requested
+          spiritMatches.push(classic);
+          seenIds.add(classic.id);
         }
+      } else if (!targetSpirit && matchesFlavor(classic)) {
+        fallbackFlavorMatches.push(classic);
+        seenIds.add(classic.id);
       }
     }
 
-    // If still under 6, add highest overall bar-match classic cocktails
-    if (directMatches.length + secondaryMatches.length < 6) {
-      for (const classic of CLASSIC_COCKTAILS) {
-        if (addedIds.has(`web-${classic.id}`)) continue;
-        secondaryMatches.push(formatClassic(classic));
-        addedIds.add(`web-${classic.id}`);
-        if (directMatches.length + secondaryMatches.length >= 8) break;
+    // Convert and sort each priority bucket by inventory matchScore
+    const formatAndSort = (specs: ClassicCocktailSpec[]) => {
+      return specs.map(formatClassic).sort((a, b) => b.matchScore - a.matchScore);
+    };
+
+    const sortedExact = formatAndSort(exactMatches);
+    const sortedFlavor = formatAndSort(flavorMatches.filter((s) => !seenIds.has(s.id) || !exactMatches.includes(s)));
+    const sortedSpirit = formatAndSort(spiritMatches.filter((s) => !exactMatches.includes(s) && !flavorMatches.includes(s)));
+    const sortedFallback = formatAndSort(fallbackFlavorMatches);
+
+    // Combine strictly in order of survey alignment
+    const combinedWebMatches: CocktailRecommendationResult[] = [
+      ...sortedExact,
+      ...sortedFlavor,
+      ...sortedSpirit,
+      ...sortedFallback,
+    ];
+
+    // Deduplicate by ID
+    const webClassicMatches: CocktailRecommendationResult[] = [];
+    const uniqueIds = new Set<string>();
+    for (const match of combinedWebMatches) {
+      if (!uniqueIds.has(match.id)) {
+        uniqueIds.add(match.id);
+        webClassicMatches.push(match);
       }
+      if (webClassicMatches.length >= 6) break;
     }
 
-    directMatches.sort((a, b) => b.matchScore - a.matchScore);
-    secondaryMatches.sort((a, b) => b.matchScore - a.matchScore);
-
-    const webClassicMatches = [...directMatches, ...secondaryMatches].slice(0, 8);
-
-    // Combine Tier 1 & Tier 2: Library matches first, followed by 4-6 digital craft specs
+    // Combine Tier 1 & Tier 2: Library matches first, followed by curated digital craft specs
     return NextResponse.json({
       success: true,
       libraryCount: libraryMatches.length,

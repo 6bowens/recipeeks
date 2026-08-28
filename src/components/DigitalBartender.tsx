@@ -18,8 +18,10 @@ import {
   AlertCircle,
   Clock,
   Sparkle,
+  Plus,
 } from 'lucide-react';
 import { CocktailRecommendationResult } from '@/app/api/cocktails/recommend/route';
+import { deduceBarCategory, isRecognizedBarStaple } from '@/lib/cocktail-utils';
 
 const SPIRIT_OPTIONS = [
   { id: 'Bourbon', label: 'Bourbon / Rye', icon: '🥃', desc: 'Warm oak, caramel & rye spice' },
@@ -36,19 +38,19 @@ const FLAVOR_PROFILES = [
     id: 'boozy',
     label: 'Spirit-Forward & Boozy',
     icon: '🥃',
-    desc: 'Deep, warming stirred classics like Old Fashioned & Manhattan',
+    desc: 'Deep, warming stirred classics like Old Fashioned, Manhattan & Oaxacan',
   },
   {
     id: 'sour',
     label: 'Crisp, Citrusy & Sour',
     icon: '🍋',
-    desc: 'Bright balance of citrus & sweetness like Daiquiri, Gimlet & Margarita',
+    desc: 'Bright balance of citrus & sweetness like Tommy\'s Margarita, Daiquiri & Gimlet',
   },
   {
     id: 'bitter',
     label: 'Bitter & Aperitivo',
     icon: '🍊',
-    desc: 'Complex bittersweet depth like Negroni, Paper Plane & Boulevardier',
+    desc: 'Complex bittersweet depth like Negroni, Paper Plane & Siesta',
   },
   {
     id: 'highball',
@@ -60,19 +62,19 @@ const FLAVOR_PROFILES = [
     id: 'tiki',
     label: 'Tropical & Tiki',
     icon: '🍍',
-    desc: 'Exotic rums, orgeat & punch like Mai Tai, Jungle Bird & Painkiller',
+    desc: 'Exotic fruit, orgeat & layered rums like 1944 Mai Tai & Jungle Bird',
   },
   {
     id: 'herbal',
     label: 'Herbal & Botanical',
     icon: '🌿',
-    desc: 'Intricate alpine amari & herbs like The Last Word & Southside',
+    desc: 'Green herbs & aromatic botanicals like The Last Word, Naked & Famous & Sazerac',
   },
   {
     id: 'dessert',
-    label: 'Rich & Dessert / Creamy',
+    label: 'Rich & Decadent',
     icon: '☕',
-    desc: 'Indulgent coffee & cream drinks like Espresso Martini',
+    desc: 'Coffee, cocoa & luscious dessert notes like Espresso Martini',
   },
 ];
 
@@ -84,10 +86,12 @@ const COMPLEXITY_LEVELS = [
 
 export function DigitalBartender() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [selectedSpirit, setSelectedSpirit] = useState<string>('Bourbon');
-  const [selectedFlavor, setSelectedFlavor] = useState<string>('boozy');
+  const [selectedSpirit, setSelectedSpirit] = useState<string>('Tequila');
+  const [selectedFlavor, setSelectedFlavor] = useState<string>('sour');
   const [selectedComplexity, setSelectedComplexity] = useState<string>('classic');
   const [loading, setLoading] = useState(false);
+  const [addingIng, setAddingIng] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [results, setResults] = useState<{
     libraryMatches: CocktailRecommendationResult[];
     webClassicMatches: CocktailRecommendationResult[];
@@ -117,6 +121,77 @@ export function DigitalBartender() {
     }
   };
 
+  const handleQuickAddIngredient = async (ingredientName: string) => {
+    try {
+      setAddingIng(ingredientName);
+      const res = await fetch('/api/pantry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: ingredientName,
+          category: deduceBarCategory(ingredientName),
+          isAlwaysAvailable: isRecognizedBarStaple(ingredientName),
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to add ingredient to bar cart');
+
+      // Optimistically update all cocktail results with this stocked ingredient
+      setResults((prev) => {
+        if (!prev) return prev;
+
+        const updateList = (list: CocktailRecommendationResult[]) =>
+          list.map((c) => {
+            const hasThisIng = c.ingredients.some(
+              (i) =>
+                i.name.toLowerCase() === ingredientName.toLowerCase() ||
+                i.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
+                ingredientName.toLowerCase().includes(i.name.toLowerCase())
+            );
+            if (!hasThisIng) return c;
+
+            const updatedIngredients = c.ingredients.map((i) => {
+              if (
+                i.name.toLowerCase() === ingredientName.toLowerCase() ||
+                i.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
+                ingredientName.toLowerCase().includes(i.name.toLowerCase())
+              ) {
+                return { ...i, isStocked: true };
+              }
+              return i;
+            });
+
+            const stockedCount = updatedIngredients.filter((i) => i.isStocked).length;
+            const newScore = Math.round((stockedCount / updatedIngredients.length) * 100);
+
+            return {
+              ...c,
+              matchScore: newScore,
+              ingredients: updatedIngredients,
+              matchedIngredients: [...c.matchedIngredients, ingredientName],
+              missingIngredients: c.missingIngredients.filter(
+                (m) =>
+                  !m.toLowerCase().includes(ingredientName.toLowerCase()) &&
+                  !ingredientName.toLowerCase().includes(m.toLowerCase())
+              ),
+            };
+          });
+
+        return {
+          libraryMatches: updateList(prev.libraryMatches),
+          webClassicMatches: updateList(prev.webClassicMatches),
+        };
+      });
+
+      setToastMessage(`✨ Added "${ingredientName}" to your Bar Cart!`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (err) {
+      alert('Error adding ingredient: ' + (err as Error).message);
+    } finally {
+      setAddingIng(null);
+    }
+  };
+
   const resetWizard = () => {
     setStep(1);
     setResults(null);
@@ -126,6 +201,14 @@ export function DigitalBartender() {
 
   return (
     <div className="space-y-6">
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-950 border border-emerald-500 text-emerald-200 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 font-semibold text-xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Wizard Progress & Speakeasy Intro */}
       <div className="bg-gradient-to-r from-[#12151c] via-[#1a171d] to-[#12151c] rounded-3xl p-6 sm:p-8 text-white shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-amber-900/30 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -139,14 +222,15 @@ export function DigitalBartender() {
           <h2 className="text-2xl sm:text-3xl font-serif font-bold text-white leading-tight">
             What are you in the mood to sip?
           </h2>
-          <p className="text-xs sm:text-sm text-charcoal-300 mt-1 max-w-xl">
-            Answer 3 quick questions. We&apos;ll check your physical cocktail books first for an exact page match, then add curated digital craft classics using your bottles.
+          <p className="text-xs sm:text-sm text-charcoal-400 max-w-2xl mt-1">
+            Answer 3 quick sensory questions. Recipeeks pairs your craving with cocktail books in your library and matches with your bar cart.
           </p>
         </div>
 
-        <div className="relative z-10">
+        {/* Step Indicator */}
+        <div className="relative z-10 shrink-0">
           {step < 4 ? (
-            <div className="flex items-center gap-2 bg-black/60 px-4 py-2 rounded-2xl border border-white/10 text-xs font-semibold backdrop-blur-md">
+            <div className="flex items-center gap-2 bg-[#0d0f14] border border-amber-900/40 px-3.5 py-2 rounded-2xl text-xs">
               <span className={step >= 1 ? 'text-amber-400 font-bold' : 'text-charcoal-500'}>1. Spirit</span>
               <ChevronRight className="w-3 h-3 text-charcoal-600" />
               <span className={step >= 2 ? 'text-amber-400 font-bold' : 'text-charcoal-500'}>2. Flavor</span>
@@ -301,18 +385,17 @@ export function DigitalBartender() {
                       : 'border-white/5 hover:border-amber-700/40 bg-[#161a22]/70 hover:bg-[#1c212b]'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <Sliders className="w-5 h-5 text-amber-400" />
-                    {isSelected && (
+                  <div>
+                    <h4 className="font-bold text-sm text-white">{lvl.label}</h4>
+                    <p className="text-[11px] text-charcoal-400 mt-1">{lvl.desc}</p>
+                  </div>
+                  {isSelected && (
+                    <div className="mt-3 flex justify-end">
                       <span className="bg-amber-500 text-black p-1 rounded-full shadow-sm">
                         <Check className="w-3 h-3 stroke-[3]" />
                       </span>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-white">{lvl.label}</h4>
-                    <p className="text-[11px] text-charcoal-400 mt-0.5">{lvl.desc}</p>
-                  </div>
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -327,82 +410,77 @@ export function DigitalBartender() {
             </button>
             <button
               onClick={handleGenerateRecommendations}
-              disabled={loading}
-              className="px-8 py-3 bg-gradient-to-r from-red-700 via-rose-700 to-amber-600 hover:brightness-110 text-white font-bold text-xs rounded-xl shadow-xl flex items-center gap-2 cursor-pointer transition-all"
+              className="px-8 py-3.5 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-charcoal-950 font-extrabold text-sm rounded-xl shadow-xl flex items-center gap-2 cursor-pointer transition-all hover:scale-105"
             >
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>{loading ? 'Consulting Your Bar...' : 'Craft My Recommendations'}</span>
+              <Sparkles className="w-4 h-4 fill-charcoal-950" />
+              <span>Shake Up Recommendations</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 4: RECOMMENDATIONS RESULTS (COMBINED BLENDED STREAM) */}
+      {/* STEP 4: RECOMMENDATIONS FEED */}
       {step === 4 && (
         <div className="space-y-6 animate-in fade-in">
           {loading ? (
-            <div className="bg-[#12151b] rounded-2xl p-12 text-center border border-amber-900/30 shadow-2xl space-y-4">
-              <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto animate-spin">
-                <Wine className="w-6 h-6" />
+            <div className="bg-[#12151b] rounded-3xl p-12 text-center border border-amber-900/30 shadow-2xl space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mx-auto text-amber-300 animate-bounce">
+                <GlassWater className="w-8 h-8" />
               </div>
-              <h3 className="text-lg font-serif font-bold text-white">
-                Searching Your Cocktail Books & Bar Cart...
+              <h3 className="text-xl font-serif font-bold text-white">
+                Crafting Your Tailored Speakeasy Menu...
               </h3>
               <p className="text-xs text-charcoal-400 max-w-md mx-auto">
-                Scanning your physical book collection first, then blending in digital craft recipes matched to your bottles.
+                Consulting your indexed cocktail books and cross-referencing your active bar cart bottles.
               </p>
             </div>
           ) : results ? (
             <div className="space-y-6">
-              {/* Filter Pills & Summary Bar */}
-              <div className="bg-[#12151b] border border-amber-900/30 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
-                <div>
-                  <h3 className="text-base font-serif font-bold text-white flex items-center gap-2">
-                    <span>Curated Mixology Specs</span>
-                    <span className="text-xs font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                      {(results.libraryMatches?.length || 0) + (results.webClassicMatches?.length || 0)} Cocktails
-                    </span>
-                  </h3>
-                  <p className="text-xs text-charcoal-400 mt-0.5">
-                    {results.libraryMatches && results.libraryMatches.length > 0
-                      ? `Found ${results.libraryMatches.length} in your books + ${results.webClassicMatches.length} digital craft matches.`
-                      : `0 physical book matches — showing ${results.webClassicMatches.length} digital craft matches for your bar.`}
-                  </p>
+              {/* Filter Pills */}
+              <div className="flex items-center justify-between gap-4 flex-wrap bg-[#12151b] p-3 rounded-2xl border border-amber-900/30">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-charcoal-400 font-medium">Filter View:</span>
+                  <div className="flex items-center gap-1 text-xs">
+                    <button
+                      onClick={() => setResultFilter('all')}
+                      className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                        resultFilter === 'all'
+                          ? 'bg-amber-500 text-charcoal-950 shadow-sm'
+                          : 'text-charcoal-400 hover:text-white'
+                      }`}
+                    >
+                      All ({(results.libraryMatches?.length || 0) + (results.webClassicMatches?.length || 0)})
+                    </button>
+                    <button
+                      onClick={() => setResultFilter('books')}
+                      className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                        resultFilter === 'books'
+                          ? 'bg-amber-500 text-charcoal-950 shadow-sm'
+                          : 'text-charcoal-400 hover:text-white'
+                      }`}
+                    >
+                      📖 Books ({results.libraryMatches?.length || 0})
+                    </button>
+                    <button
+                      onClick={() => setResultFilter('digital')}
+                      className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                        resultFilter === 'digital'
+                          ? 'bg-amber-500 text-charcoal-950 shadow-sm'
+                          : 'text-charcoal-400 hover:text-white'
+                      }`}
+                    >
+                      🌐 Digital ({results.webClassicMatches?.length || 0})
+                    </button>
+                  </div>
                 </div>
 
-                {/* Filter Switcher */}
-                <div className="flex items-center gap-1 bg-[#181c25] p-1 rounded-xl border border-white/5 text-xs">
-                  <button
-                    onClick={() => setResultFilter('all')}
-                    className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                      resultFilter === 'all'
-                        ? 'bg-amber-500 text-charcoal-950 shadow-sm'
-                        : 'text-charcoal-400 hover:text-white'
-                    }`}
-                  >
-                    All ({(results.libraryMatches?.length || 0) + (results.webClassicMatches?.length || 0)})
-                  </button>
-                  <button
-                    onClick={() => setResultFilter('books')}
-                    className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                      resultFilter === 'books'
-                        ? 'bg-amber-500 text-charcoal-950 shadow-sm'
-                        : 'text-charcoal-400 hover:text-white'
-                    }`}
-                  >
-                    📖 Books ({results.libraryMatches?.length || 0})
-                  </button>
-                  <button
-                    onClick={() => setResultFilter('digital')}
-                    className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                      resultFilter === 'digital'
-                        ? 'bg-amber-500 text-charcoal-950 shadow-sm'
-                        : 'text-charcoal-400 hover:text-white'
-                    }`}
-                  >
-                    🌐 Digital ({results.webClassicMatches?.length || 0})
-                  </button>
-                </div>
+                <button
+                  onClick={resetWizard}
+                  className="text-xs font-semibold text-amber-400 hover:text-amber-300 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Change Survey Options</span>
+                </button>
               </div>
 
               {/* STREAM 1: Physical Book Matches First */}
@@ -421,29 +499,39 @@ export function DigitalBartender() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {results.libraryMatches.map((drink) => (
-                        <CocktailCard key={drink.id} cocktail={drink} />
+                        <CocktailCard
+                          key={drink.id}
+                          cocktail={drink}
+                          onQuickAdd={handleQuickAddIngredient}
+                          addingIng={addingIng}
+                        />
                       ))}
                     </div>
                   </div>
                 )}
 
-              {/* STREAM 2: Digital Craft & Web Classics (Filling out the page) */}
+              {/* STREAM 2: Digital Craft & Web Classics (Curated strictly to survey) */}
               {(resultFilter === 'all' || resultFilter === 'digital') &&
                 results.webClassicMatches &&
                 results.webClassicMatches.length > 0 && (
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center gap-2">
                       <span className="bg-blue-500/20 border border-blue-400/40 text-blue-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 font-mono">
-                        <Globe className="w-3.5 h-3.5 text-blue-300" /> Digital & Speakeasy Classics
+                        <Globe className="w-3.5 h-3.5 text-blue-300" /> Curated Craft Classics
                       </span>
                       <span className="text-xs text-charcoal-400">
-                        {results.webClassicMatches.length} craft recipes matched to your bar cart
+                        {results.webClassicMatches.length} speakeasy recipes tailored to your choices & bar cart
                       </span>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {results.webClassicMatches.map((drink) => (
-                        <CocktailCard key={drink.id} cocktail={drink} />
+                        <CocktailCard
+                          key={drink.id}
+                          cocktail={drink}
+                          onQuickAdd={handleQuickAddIngredient}
+                          addingIng={addingIng}
+                        />
                       ))}
                     </div>
                   </div>
@@ -468,7 +556,15 @@ export function DigitalBartender() {
   );
 }
 
-function CocktailCard({ cocktail }: { cocktail: CocktailRecommendationResult }) {
+function CocktailCard({
+  cocktail,
+  onQuickAdd,
+  addingIng,
+}: {
+  cocktail: CocktailRecommendationResult;
+  onQuickAdd: (ingredientName: string) => void;
+  addingIng: string | null;
+}) {
   return (
     <div className="bg-[#13161c] rounded-2xl border border-white/10 p-5 shadow-xl flex flex-col justify-between hover:border-amber-500/40 transition-colors">
       <div>
@@ -518,29 +614,47 @@ function CocktailCard({ cocktail }: { cocktail: CocktailRecommendationResult }) 
         {/* Ingredients Spec */}
         <div className="space-y-1.5 mt-2">
           <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500/80 font-mono">Specs / Build:</span>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             {cocktail.ingredients.map((ing, idx) => (
               <div
                 key={idx}
-                className={`text-xs flex items-center justify-between py-1 px-2 rounded-lg ${
+                className={`text-xs flex items-center justify-between py-1.5 px-2.5 rounded-xl transition-all ${
                   ing.isStocked
                     ? 'bg-emerald-950/40 text-emerald-200 font-medium border border-emerald-800/30'
-                    : 'text-charcoal-400 opacity-70 bg-white/[0.02]'
+                    : 'text-charcoal-300 bg-white/[0.03] border border-white/5'
                 }`}
               >
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2 min-w-0">
                   {ing.isStocked ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   ) : (
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
                   )}
-                  <span>{ing.name}</span>
+                  <span className="truncate">{ing.name}</span>
                 </div>
-                {ing.amount && (
-                  <span className="font-mono text-[11px] text-charcoal-400 shrink-0">
-                    {ing.amount} {ing.unit || ''}
-                  </span>
-                )}
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {ing.amount && (
+                    <span className="font-mono text-[11px] text-charcoal-400">
+                      {ing.amount} {ing.unit || ''}
+                    </span>
+                  )}
+
+                  {!ing.isStocked && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onQuickAdd(ing.name);
+                      }}
+                      disabled={addingIng === ing.name}
+                      title={`Add ${ing.name} to your Bar Cart`}
+                      className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/40 transition-all cursor-pointer shadow-xs active:scale-95"
+                    >
+                      <Plus className="w-2.5 h-2.5 stroke-[3]" />
+                      <span>{addingIng === ing.name ? 'Adding...' : 'I have this'}</span>
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
