@@ -128,7 +128,7 @@ function NavbarContent() {
           <div className="flex items-center gap-4 sm:gap-6">
             {isCocktails ? (
               <Link
-                href="/"
+                href="/library"
                 title="Return to Recipeeks Kitchen"
                 className="flex items-center gap-2.5 group cursor-pointer"
               >
