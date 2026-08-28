@@ -11,6 +11,8 @@ import {
   Filter,
   Sparkles,
   Trash2,
+  ArrowRight,
+  Layers,
 } from 'lucide-react';
 import { BookCard } from '@/components/BookCard';
 import { RecipeModal } from '@/components/RecipeModal';
@@ -92,27 +94,66 @@ export default function LibraryPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 sm:pb-12">
       {/* Header & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-charcoal-900 flex items-center gap-2.5">
-            <BookOpen className="w-8 h-8 text-red-700" /> Digital Library
+          <div className="flex items-center gap-2 mb-1">
+            <span className="bg-red-100 text-red-900 border border-red-200/80 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full font-mono">
+              Step 1 of 3: Cookbooks
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-charcoal-900 flex items-center gap-2.5">
+            <BookOpen className="w-7 h-7 sm:w-8 sm:h-8 text-red-700" /> Digital Library
           </h1>
           <p className="text-xs sm:text-sm text-charcoal-500 mt-1">
-            Browse and manage all physical cookbooks indexed in your personal culinary collection.
+            Browse and manage physical cookbooks indexed in your personal culinary collection.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <Link
             href="/scan"
-            className="flex items-center gap-2 px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-xl shadow-sm transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
           >
             <Camera className="w-4 h-4" /> Scan Bookshelf
           </Link>
+          <Link
+            href="/pantry"
+            className="flex items-center gap-2 px-4 py-2.5 bg-charcoal-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition-all hover:scale-105"
+          >
+            <span>Next: Update Fridge</span>
+            <ArrowRight className="w-4 h-4 text-red-400" />
+          </Link>
         </div>
       </div>
+
+      {/* Guided Next-Step Banner */}
+      {cookbooks.length > 0 && (
+        <div className="bg-gradient-to-r from-red-50 via-rose-50 to-amber-50/50 border border-red-200/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-red-700 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
+              2
+            </div>
+            <div>
+              <h3 className="font-serif font-bold text-sm sm:text-base text-charcoal-900 leading-tight">
+                Step 2: Update Your Pantry & Fridge
+              </h3>
+              <p className="text-xs text-charcoal-600 mt-0.5">
+                Scan your fridge/pantry or snap ingredient photos so Recipeeks can cross-reference your collection.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/pantry"
+            className="px-5 py-2.5 bg-red-700 hover:bg-red-800 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all hover:scale-105 shrink-0"
+          >
+            <span>Go to Step 2: Pantry & Fridge</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
 
       {/* Search bar */}
       <div className="relative">
@@ -122,7 +163,7 @@ export default function LibraryPage() {
           placeholder="Search cookbooks by title, author, or publisher..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 text-sm bg-white rounded-2xl border border-red-900/10 shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500/40 text-charcoal-800 placeholder-charcoal-400"
+          className="w-full pl-10 pr-4 py-3 text-sm bg-white rounded-2xl border border-red-900/10 shadow-xs focus:outline-none focus:ring-2 focus:ring-red-500/40 text-charcoal-800 placeholder-charcoal-400"
         />
       </div>
 
@@ -169,6 +210,29 @@ export default function LibraryPage() {
               onIndexUpdated={fetchCookbooks}
             />
           ))}
+        </div>
+      )}
+
+      {/* Floating Bottom Step Bar (Prominent on Mobile) */}
+      {cookbooks.length > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-11/12 max-w-md bg-charcoal-950/95 border border-charcoal-700/70 backdrop-blur-xl text-white px-4 py-2.5 rounded-2xl shadow-2xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-6 h-6 rounded-full bg-red-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs">
+              1
+            </span>
+            <div className="leading-tight truncate">
+              <div className="text-[10px] text-charcoal-400 font-semibold uppercase tracking-wider">Step 1 Complete</div>
+              <div className="text-xs font-bold text-white truncate">{cookbooks.length} Books Indexed</div>
+            </div>
+          </div>
+
+          <Link
+            href="/pantry"
+            className="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-1.5 transition-all hover:scale-105 shrink-0"
+          >
+            <span>Update Fridge</span>
+            <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
+          </Link>
         </div>
       )}
 

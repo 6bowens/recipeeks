@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   Camera,
   Plus,
@@ -22,6 +23,7 @@ import {
   ShoppingBag,
   RefreshCw,
   AlertTriangle,
+  ArrowRight,
 } from 'lucide-react';
 import { PantryItemData } from '@/types';
 import { KITCHEN_STAPLES, isRecognizedKitchenStaple } from '@/lib/utils';
@@ -415,6 +417,33 @@ export function PantryManager() {
           </button>
         </div>
       </div>
+
+      {/* Guided Next-Step Banner */}
+      {items.length > 0 && (
+        <div className="bg-gradient-to-r from-red-50 via-rose-50 to-amber-50/50 border border-red-200/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-red-700 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
+              3
+            </div>
+            <div>
+              <h3 className="font-serif font-bold text-sm sm:text-base text-charcoal-900 leading-tight">
+                Step 3: See What You Can Cook
+              </h3>
+              <p className="text-xs text-charcoal-600 mt-0.5">
+                You have {items.length} ingredients stocked. Match them against your indexed cookbooks and filter by must-use cuts.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/match"
+            className="px-5 py-2.5 bg-red-700 hover:bg-red-800 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all hover:scale-105 shrink-0"
+          >
+            <span>Go to Step 3: Ready to Cook</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
 
       {/* Toast Alert */}
       {statusMessage && (
@@ -845,6 +874,29 @@ export function PantryManager() {
           </div>
         </div>
       )}
+      {/* Floating Bottom Step Bar (Prominent on Mobile) */}
+      {items.length > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-11/12 max-w-md bg-charcoal-950/95 border border-charcoal-700/70 backdrop-blur-xl text-white px-4 py-2.5 rounded-2xl shadow-2xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-6 h-6 rounded-full bg-red-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs">
+              2
+            </span>
+            <div className="leading-tight truncate">
+              <div className="text-[10px] text-charcoal-400 font-semibold uppercase tracking-wider">Step 2 Complete</div>
+              <div className="text-xs font-bold text-white truncate">{items.length} Items Stocked</div>
+            </div>
+          </div>
+
+          <Link
+            href="/match"
+            className="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-1.5 transition-all hover:scale-105 shrink-0"
+          >
+            <span>See What to Cook</span>
+            <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
+          </Link>
+        </div>
+      )}
+
       {/* AI Budget Limit Modal */}
       <BudgetLimitModal
         isOpen={budgetModal.isOpen}

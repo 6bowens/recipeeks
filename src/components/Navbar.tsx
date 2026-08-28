@@ -1,41 +1,41 @@
 'use client';
 
-import React, { useEffect, useState, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import {
-  BookOpen,
-  Camera,
-  UtensilsCrossed,
-  Sparkles,
-  Download,
-  LogOut,
-  User as UserIcon,
   ChefHat,
+  BookOpen,
+  Layers,
+  Sparkles,
+  User,
+  LogOut,
   Menu,
   X,
-  Layers,
   Zap,
-  Shield,
   Wine,
+  GlassWater,
+  Shield,
+  Download,
   ChevronDown,
+  ArrowRight,
 } from 'lucide-react';
 
 function NavbarContent() {
-  const pathname = usePathname();
   const { data: session, status } = useSession();
+  const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [stats, setStats] = useState<{
     totalCookbooks: number;
     totalRecipes: number;
     totalUniqueIngredients: number;
     estimatedAiSpend?: string;
     estimatedAiSpendExact?: string;
-    totalVisionScans?: number;
   } | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
+
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const searchParams = useSearchParams();
@@ -44,9 +44,9 @@ function NavbarContent() {
   const cocktailTab = searchParams.get('tab') || 'bartender';
 
   const cookingNavLinks = [
-    { href: '/library', label: 'Library', icon: BookOpen },
-    { href: '/pantry', label: 'Pantry & Fridge', icon: Layers },
-    { href: '/match', label: 'Ready to Cook', icon: Sparkles, highlight: true },
+    { href: '/library', step: 1, label: 'Library', shortLabel: '1. Library', icon: BookOpen },
+    { href: '/pantry', step: 2, label: 'Pantry & Fridge', shortLabel: '2. Fridge & Pantry', icon: Layers },
+    { href: '/match', step: 3, label: 'Ready to Cook', shortLabel: '3. Ready to Cook', icon: Sparkles, highlight: true },
   ];
 
   const cocktailNavLinks = [
@@ -125,7 +125,7 @@ function NavbarContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           {/* Logo & Brand */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
             {isCocktails ? (
               <Link
                 href="/"
@@ -171,37 +171,68 @@ function NavbarContent() {
           </div>
 
           {/* Center/Right Nav Links & Spend Badge */}
-          <div className="flex items-center gap-3">
-            {/* Desktop Nav Links */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Desktop Nav Links: 1 -> 2 -> 3 Step Flow */}
             <nav className="hidden md:flex items-center gap-1 sm:gap-1.5">
-              {session?.user &&
-                activeLinks.map((link: any) => {
+              {session?.user && !isCocktails ? (
+                <div className="flex items-center gap-1 bg-charcoal-50 p-1 rounded-2xl border border-charcoal-200/70 shadow-2xs">
+                  {cookingNavLinks.map((link, idx) => {
+                    const Icon = link.icon;
+                    const isActive = pathname === link.href;
+
+                    return (
+                      <React.Fragment key={link.href}>
+                        <Link
+                          href={link.href}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                            isActive
+                              ? 'bg-red-800 text-white shadow-xs'
+                              : link.highlight
+                              ? 'text-red-900 bg-red-100/70 hover:bg-red-200/80 border border-red-200/80'
+                              : 'text-charcoal-600 hover:text-charcoal-900 hover:bg-white'
+                          }`}
+                        >
+                          <span
+                            className={`w-4 h-4 rounded-full text-[10px] font-extrabold flex items-center justify-center ${
+                              isActive
+                                ? 'bg-white text-red-900'
+                                : 'bg-charcoal-200/90 text-charcoal-700'
+                            }`}
+                          >
+                            {link.step}
+                          </span>
+                          <span>{link.label}</span>
+                        </Link>
+                        {idx < cookingNavLinks.length - 1 && (
+                          <span className="text-charcoal-300 text-xs px-0.5 select-none font-bold">
+                            →
+                          </span>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              ) : session?.user && isCocktails ? (
+                cocktailNavLinks.map((link: any) => {
                   const Icon = link.icon;
-                  const isActive = isCocktails
-                    ? link.tabId === cocktailTab
-                    : pathname === link.href;
+                  const isActive = link.tabId === cocktailTab;
 
                   return (
                     <Link
                       key={link.href}
                       href={link.href}
                       className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
-                        isCocktails
-                          ? isActive
-                            ? 'bg-amber-500 text-charcoal-950 font-bold shadow-md'
-                            : 'text-charcoal-300 hover:text-white hover:bg-white/10 border border-transparent'
-                          : isActive
-                          ? 'bg-red-50 text-red-900 shadow-xs'
-                          : link.highlight
-                          ? 'text-red-900 bg-red-50/50 hover:bg-red-100/80 border border-red-200/70'
-                          : 'text-charcoal-600 hover:text-charcoal-900 hover:bg-charcoal-100/70'
+                        isActive
+                          ? 'bg-amber-500 text-charcoal-950 font-bold shadow-md'
+                          : 'text-charcoal-300 hover:text-white hover:bg-white/10 border border-transparent'
                       }`}
                     >
-                      <Icon className={`w-3.5 h-3.5 ${link.highlight ? 'text-red-700' : ''}`} />
+                      <Icon className="w-3.5 h-3.5" />
                       <span>{link.label}</span>
                     </Link>
                   );
-                })}
+                })
+              ) : null}
 
               {/* AI Spend Badge */}
               {session?.user && stats?.estimatedAiSpend && (
@@ -354,13 +385,19 @@ function NavbarContent() {
           </div>
         </div>
 
-        {/* Mobile dropdown */}
+        {/* Mobile dropdown with 1 -> 2 -> 3 Guided Workflow */}
         {mobileMenuOpen && session?.user && (
           <div
-            className={`md:hidden py-3 border-t space-y-1 animate-in fade-in ${
+            className={`md:hidden py-3 border-t space-y-1.5 animate-in fade-in ${
               isCocktails ? 'border-amber-900/30' : 'border-charcoal-200'
             }`}
           >
+            {!isCocktails && (
+              <div className="px-2 py-1 text-[10px] font-bold text-charcoal-400 uppercase tracking-wider font-mono">
+                Kitchen Engine Steps:
+              </div>
+            )}
+
             {activeLinks.map((link: any) => {
               const Icon = link.icon;
               const isActive = isCocktails
@@ -372,18 +409,36 @@ function NavbarContent() {
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium ${
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium ${
                     isCocktails
                       ? isActive
                         ? 'bg-amber-500 text-charcoal-950 font-bold'
                         : 'text-charcoal-300 hover:bg-white/5'
                       : isActive
-                      ? 'bg-red-50 text-red-950 font-bold'
+                      ? 'bg-red-800 text-white font-bold shadow-xs'
                       : 'text-charcoal-700 hover:bg-charcoal-100'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  {link.label}
+                  <div className="flex items-center gap-2.5">
+                    {link.step ? (
+                      <span
+                        className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center ${
+                          isActive
+                            ? 'bg-white text-red-900'
+                            : 'bg-charcoal-200 text-charcoal-800'
+                        }`}
+                      >
+                        {link.step}
+                      </span>
+                    ) : (
+                      <Icon className="w-4 h-4" />
+                    )}
+                    <span>{link.label}</span>
+                  </div>
+
+                  {link.step && (
+                    <ArrowRight className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-charcoal-400'}`} />
+                  )}
                 </Link>
               );
             })}
