@@ -98,59 +98,61 @@ export default function HomePage() {
   };
 
   return (
-    <div className="space-y-10">
-      {/* Hero Welcome Banner */}
-      <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-crimson-950 via-crimson-900 to-charcoal-950 text-white p-8 sm:p-12 shadow-xl">
-        <div className="absolute -right-12 -bottom-12 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="space-y-8">
+      {/* Hero Welcome Banner (Shown only for guests or before books are indexed) */}
+      {(!session?.user || cookbooks.length === 0) && (
+        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-crimson-950 via-crimson-900 to-charcoal-950 text-white p-8 sm:p-12 shadow-xl animate-in fade-in">
+          <div className="absolute -right-12 -bottom-12 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="max-w-3xl space-y-4 relative z-10">
-          <div className="inline-flex items-center gap-2 bg-rose-500/20 border border-rose-400/30 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider text-rose-200">
-            <ChefHat className="w-3.5 h-3.5" /> Interactive Cookbook Engine
-          </div>
+          <div className="max-w-3xl space-y-4 relative z-10">
+            <div className="inline-flex items-center gap-2 bg-rose-500/20 border border-rose-400/30 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider text-rose-200">
+              <ChefHat className="w-3.5 h-3.5" /> Interactive Cookbook Engine
+            </div>
 
-          <h1 className="text-3xl sm:text-5xl font-bold font-serif leading-tight">
-            Turn your physical bookshelf into an interactive cookbook engine.
-          </h1>
+            <h1 className="text-3xl sm:text-5xl font-bold font-serif leading-tight">
+              Turn your physical bookshelf into an interactive cookbook engine.
+            </h1>
 
-          <p className="text-rose-100/90 text-sm sm:text-base leading-relaxed">
-            Take a photo of your cookbooks and fridge. Recipeeks indexes every recipe with exact book and page numbers, matching what you have on hand to tell you what to make tonight.
-          </p>
+            <p className="text-rose-100/90 text-sm sm:text-base leading-relaxed">
+              Take a photo of your cookbooks and fridge. Recipeeks indexes every recipe with exact book and page numbers, matching what you have on hand to tell you what to make tonight.
+            </p>
 
-          <div className="pt-4 flex flex-wrap items-center gap-3">
-            {session?.user ? (
-              <>
-                <Link
-                  href="/scan"
-                  className="flex items-center gap-2 px-5 py-3 rounded-xl bg-crimson-600 hover:bg-crimson-500 text-white font-bold text-sm shadow-md transition-all hover:scale-105"
-                >
-                  <Camera className="w-4 h-4" /> Scan Physical Bookshelf
-                </Link>
-                <Link
-                  href="/match"
-                  className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-md transition-all border border-white/20"
-                >
-                  <Sparkles className="w-4 h-4 text-rose-300" /> Ready to Cook
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link
-                  href="/register"
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-crimson-600 hover:bg-crimson-500 text-white font-bold text-sm shadow-md transition-all hover:scale-105"
-                >
-                  Get Started Free <ArrowRight className="w-4 h-4" />
-                </Link>
-                <Link
-                  href="/login"
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-md transition-all border border-white/20"
-                >
-                  Sign In
-                </Link>
-              </>
-            )}
+            <div className="pt-4 flex flex-wrap items-center gap-3">
+              {session?.user ? (
+                <>
+                  <Link
+                    href="/scan"
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl bg-crimson-600 hover:bg-crimson-500 text-white font-bold text-sm shadow-md transition-all hover:scale-105"
+                  >
+                    <Camera className="w-4 h-4" /> Scan Physical Bookshelf
+                  </Link>
+                  <Link
+                    href="/match"
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-md transition-all border border-white/20"
+                  >
+                    <Sparkles className="w-4 h-4 text-rose-300" /> Ready to Cook
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/register"
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-crimson-600 hover:bg-crimson-500 text-white font-bold text-sm shadow-md transition-all hover:scale-105"
+                  >
+                    Get Started Free <ArrowRight className="w-4 h-4" />
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-md transition-all border border-white/20"
+                  >
+                    Sign In
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Metrics Bar */}
       {session?.user && stats && (
@@ -196,7 +198,7 @@ export default function HomePage() {
       {/* Bookshelf Section */}
       {session?.user ? (
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
               <h2 className="text-2xl font-serif font-bold text-charcoal-900">
                 Your Digital Bookshelf
@@ -205,12 +207,21 @@ export default function HomePage() {
                 Click any book to browse indexed recipes, print page numbers, and ingredient checklists.
               </p>
             </div>
-            <Link
-              href="/library"
-              className="text-xs font-semibold text-red-700 hover:text-red-900 flex items-center gap-1"
-            >
-              View Full Shelf <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/scan"
+                className="text-xs font-semibold px-3.5 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white flex items-center gap-1.5 shadow-sm transition-colors"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>+ Scan Books</span>
+              </Link>
+              <Link
+                href="/library"
+                className="text-xs font-semibold text-charcoal-700 hover:text-red-900 flex items-center gap-1"
+              >
+                View Full Shelf <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
 
           {loading ? (
