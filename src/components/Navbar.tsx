@@ -70,33 +70,72 @@ export function Navbar() {
     }
   };
 
+  const isCocktails = pathname.startsWith('/cocktails');
+
   const navLinks = [
     { href: '/library', label: 'Library', icon: BookOpen },
     { href: '/pantry', label: 'Pantry & Fridge', icon: Layers },
     { href: '/match', label: 'Ready to Cook', icon: Sparkles, highlight: true },
-    { href: '/cocktails', label: 'Pour Decisions', icon: Wine },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin', icon: Shield }] : []),
   ];
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-charcoal-200/80 shadow-xs">
+    <header
+      className={`sticky top-0 z-40 backdrop-blur-md transition-colors ${
+        isCocktails
+          ? 'bg-[#0b0d10]/95 border-b border-amber-900/30 text-white shadow-lg'
+          : 'bg-white/95 border-b border-charcoal-200/80 shadow-xs'
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
-          {/* Logo & Brand */}
+          {/* Logo & Brand: Clicking toggles between Kitchen & Speakeasy */}
           <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-800 to-rose-600 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
-                <ChefHat className="w-5 h-5" />
-              </div>
-              <div className="leading-tight">
-                <span className="text-xl font-bold font-serif tracking-tight text-charcoal-900">
-                  Recipeeks
-                </span>
-              </div>
-            </Link>
+            {isCocktails ? (
+              <Link
+                href="/"
+                title="Return to Recipeeks Kitchen"
+                className="flex items-center gap-2.5 group cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-charcoal-950 shadow-md group-hover:scale-105 transition-transform">
+                  <Wine className="w-5 h-5 text-charcoal-950" />
+                </div>
+                <div className="leading-tight">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xl font-bold font-serif tracking-tight text-amber-300 group-hover:text-amber-200 transition-colors">
+                      Pour Decisions
+                    </span>
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-mono">
+                      Speakeasy
+                    </span>
+                  </div>
+                  <span className="block text-[10px] text-charcoal-400 group-hover:text-rose-300 transition-colors">
+                    ↵ Click logo to exit to Kitchen
+                  </span>
+                </div>
+              </Link>
+            ) : (
+              <Link
+                href="/cocktails"
+                title="🍸 Tap to enter Pour Decisions Speakeasy"
+                className="flex items-center gap-2.5 group cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-800 to-rose-600 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
+                  <ChefHat className="w-5 h-5" />
+                </div>
+                <div className="leading-tight">
+                  <span className="text-xl font-bold font-serif tracking-tight text-charcoal-900 group-hover:text-red-800 transition-colors">
+                    Recipeeks
+                  </span>
+                  <span className="block text-[10px] text-charcoal-400 group-hover:text-amber-700 font-mono tracking-tight transition-colors">
+                    🍸 Tap for Speakeasy
+                  </span>
+                </div>
+              </Link>
+            )}
 
             {/* Subtle Collection Stats */}
-            {session?.user && stats && (
+            {session?.user && stats && !isCocktails && (
               <div className="hidden xl:flex items-center gap-3 text-xs text-charcoal-500 pl-4 border-l border-charcoal-200">
                 <span><strong className="text-charcoal-900 font-semibold">{stats.totalCookbooks}</strong> Books</span>
                 <span>•</span>
@@ -120,15 +159,21 @@ export function Navbar() {
                       key={link.href}
                       href={link.href}
                       className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
-                        isActive
+                        isCocktails
+                          ? isActive
+                            ? 'bg-amber-950 text-amber-300 border border-amber-800/60 shadow-xs'
+                            : link.highlight
+                            ? 'text-amber-200 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-700/40'
+                            : 'text-charcoal-300 hover:text-white hover:bg-white/5'
+                          : isActive
                           ? 'bg-red-50 text-red-900 shadow-xs'
                           : link.highlight
                           ? 'text-red-900 bg-red-50/50 hover:bg-red-100/80 border border-red-200/70'
                           : 'text-charcoal-600 hover:text-charcoal-900 hover:bg-charcoal-100/70'
                       }`}
                     >
-                      <Icon className={`w-3.5 h-3.5 ${link.highlight ? 'text-red-700' : ''}`} />
-                      {link.label}
+                      <Icon className={`w-3.5 h-3.5 ${link.highlight ? (isCocktails ? 'text-amber-400' : 'text-red-700') : ''}`} />
+                      <span>{link.label}</span>
                     </Link>
                   );
                 })}
@@ -136,7 +181,11 @@ export function Navbar() {
               {/* AI Spend Badge */}
               {session?.user && stats?.estimatedAiSpend && (
                 <div
-                  className="hidden sm:flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 rounded-lg ml-1"
+                  className={`hidden sm:flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg ml-1 border ${
+                    isCocktails
+                      ? 'text-amber-300 bg-amber-950/50 border-amber-800'
+                      : 'text-emerald-800 bg-emerald-50 border-emerald-200/80'
+                  }`}
                   title={`Estimated API spend: ${stats.estimatedAiSpendExact || stats.estimatedAiSpend}`}
                 >
                   <Zap className="w-3 h-3 text-emerald-600 fill-emerald-500" />

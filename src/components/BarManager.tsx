@@ -51,8 +51,6 @@ export function BarManager() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [detectedItems, setDetectedItems] = useState<{ name: string; category: string; isAlwaysAvailable: boolean; selected: boolean }[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemCategory, setNewItemCategory] = useState('spirits');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const [budgetModal, setBudgetModal] = useState<{
@@ -70,7 +68,6 @@ export function BarManager() {
       const res = await fetch('/api/pantry');
       const data = await res.json();
       if (data?.items) {
-        // Filter pantry items that belong to bar categories or have spirit/cocktail keywords
         const barCats = ['spirits', 'liqueurs', 'mixers', 'bitters_syrups', 'produce', 'ice_garnishes', 'bar'];
         const filtered = data.items.filter((it: PantryItemData) =>
           barCats.includes(it.category || '') || isRecognizedBarStaple(it.name)
@@ -245,22 +242,23 @@ export function BarManager() {
   return (
     <div className="space-y-6">
       {/* Bar Cart Header Banner */}
-      <div className="bg-gradient-to-r from-amber-950 via-charcoal-900 to-crimson-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 border border-amber-900/30">
-        <div>
+      <div className="bg-gradient-to-r from-[#12151c] via-[#1a171d] to-[#12151c] rounded-3xl p-6 sm:p-8 text-white shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 border border-amber-900/30 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10">
           <div className="flex items-center gap-2 mb-2">
-            <span className="bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded flex items-center gap-1.5">
-              <Wine className="w-3.5 h-3.5 text-amber-300" /> Bar Cart & Liquor Cabinet
+            <span className="bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 shadow-sm">
+              <Wine className="w-3.5 h-3.5 text-amber-400" /> Bar Cart & Liquor Cabinet
             </span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-serif font-bold">
+          <h2 className="text-2xl sm:text-3xl font-serif font-bold text-white">
             Your Spirits & Bar Inventory
           </h2>
-          <p className="text-amber-100/90 text-xs sm:text-sm mt-1 max-w-xl">
+          <p className="text-charcoal-300 text-xs sm:text-sm mt-1 max-w-xl">
             Photograph your bottles, liqueurs, bitters, and fresh citrus. Pour Decisions will cross-reference them with cocktail books to tell you what you can shake up tonight.
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+        <div className="relative z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
           <input
             type="file"
             ref={fileInputRef}
@@ -273,16 +271,16 @@ export function BarManager() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={scanning}
-            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white text-charcoal-950 font-bold text-sm hover:bg-amber-50 shadow-md transition-all cursor-pointer"
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-charcoal-950 font-bold text-sm shadow-lg transition-all cursor-pointer"
           >
-            <Camera className="w-4 h-4 text-amber-700" />
+            <Camera className="w-4 h-4 text-charcoal-950" />
             <span>Scan Bar Cart</span>
           </button>
 
           <button
             onClick={handleSampleBar}
             disabled={scanning}
-            className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl bg-black/40 hover:bg-black/60 text-amber-200 font-medium text-xs backdrop-blur-md transition-all border border-amber-400/20 cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl bg-black/60 hover:bg-black/80 text-amber-300 font-medium text-xs backdrop-blur-md transition-all border border-amber-500/30 cursor-pointer shadow-md"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
             <span>Sample Speakeasy</span>
@@ -292,12 +290,12 @@ export function BarManager() {
 
       {/* Toast Alert */}
       {statusMessage && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-xs font-semibold shadow-xs flex items-center justify-between animate-in fade-in">
+        <div className="p-3.5 bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 rounded-2xl text-xs font-semibold shadow-lg flex items-center justify-between animate-in fade-in">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{statusMessage}</span>
           </div>
-          <button onClick={() => setStatusMessage(null)} className="text-emerald-700 hover:text-emerald-950 p-1">
+          <button onClick={() => setStatusMessage(null)} className="text-emerald-400 hover:text-emerald-200 p-1">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -305,25 +303,25 @@ export function BarManager() {
 
       {/* Uploaded Photos Staging Bar */}
       {uploadedPhotos.length > 0 && (
-        <div className="bg-amber-50/80 border border-amber-200 p-4 rounded-2xl space-y-3 shadow-sm animate-in fade-in">
+        <div className="bg-[#12151b] border border-amber-900/30 p-4 rounded-2xl space-y-3 shadow-xl animate-in fade-in">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
-                <ImageIcon className="w-4 h-4 text-amber-700" /> {uploadedPhotos.length} Photo(s) Queued:
+              <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5 font-mono">
+                <ImageIcon className="w-4 h-4 text-amber-400" /> {uploadedPhotos.length} Photo(s) Queued:
               </span>
               <div className="flex items-center gap-2 flex-wrap">
                 {uploadedPhotos.map((photo, idx) => (
                   <div
                     key={idx}
-                    className="relative group bg-white border border-amber-200 rounded-lg p-1.5 flex items-center gap-2 shadow-xs"
+                    className="relative group bg-[#161a22] border border-white/10 rounded-lg p-1.5 flex items-center gap-2 shadow-sm"
                   >
                     <img src={photo.base64} alt={photo.name} className="w-8 h-8 rounded object-cover" />
-                    <span className="text-[11px] font-medium text-charcoal-700 max-w-[90px] truncate">
+                    <span className="text-[11px] font-medium text-charcoal-300 max-w-[90px] truncate">
                       {photo.name}
                     </span>
                     <button
                       onClick={() => setUploadedPhotos((prev) => prev.filter((_, i) => i !== idx))}
-                      className="text-charcoal-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
+                      className="text-charcoal-500 hover:text-red-400 p-0.5 rounded cursor-pointer"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -335,16 +333,16 @@ export function BarManager() {
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="text-xs px-3 py-2 text-amber-800 hover:bg-amber-100 rounded-lg font-medium transition-colors cursor-pointer"
+                className="text-xs px-3 py-2 text-charcoal-400 hover:text-white rounded-lg font-medium transition-colors cursor-pointer"
               >
                 + Add More
               </button>
               <button
                 onClick={handleRunBarScan}
                 disabled={scanning}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-charcoal-950 rounded-xl font-bold text-xs shadow-lg transition-all cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <Sparkles className="w-3.5 h-3.5 text-charcoal-950" />
                 {scanning ? 'Analyzing Bottles...' : `Scan ${uploadedPhotos.length} Photo(s)`}
               </button>
             </div>
@@ -353,8 +351,8 @@ export function BarManager() {
       )}
 
       {/* Quick Add Common Bar Essentials */}
-      <div className="bg-white rounded-2xl border border-charcoal-200 p-4 shadow-xs">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-charcoal-600 mb-2.5 flex items-center gap-1.5">
+      <div className="bg-[#12151b] rounded-2xl border border-amber-900/20 p-4 shadow-xl">
+        <h4 className="text-xs font-bold uppercase tracking-widest text-amber-400/80 mb-2.5 flex items-center gap-1.5 font-mono">
           <span>⚡ Quick-Add Essential Bar Bottles & Mixers:</span>
         </h4>
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
@@ -367,11 +365,11 @@ export function BarManager() {
                 disabled={isStocked}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1 shrink-0 ${
                   isStocked
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 opacity-80 cursor-default'
-                    : 'bg-charcoal-50 hover:bg-amber-50 text-charcoal-700 hover:text-amber-900 border border-charcoal-200 hover:border-amber-300 cursor-pointer'
+                    ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/40 opacity-80 cursor-default'
+                    : 'bg-[#161a22] hover:bg-amber-950/60 text-charcoal-300 hover:text-amber-200 border border-white/5 hover:border-amber-500/40 cursor-pointer'
                 }`}
               >
-                {isStocked ? <Check className="w-3 h-3 text-emerald-600" /> : <Plus className="w-3 h-3 text-charcoal-500" />}
+                {isStocked ? <Check className="w-3 h-3 text-emerald-400" /> : <Plus className="w-3 h-3 text-charcoal-500" />}
                 <span>{item.name}</span>
               </button>
             );
@@ -395,8 +393,8 @@ export function BarManager() {
             onClick={() => setActiveTab(tab.id)}
             className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === tab.id
-                ? 'bg-amber-900 text-white shadow-xs'
-                : 'bg-white text-charcoal-600 hover:text-charcoal-900 border border-charcoal-200'
+                ? 'bg-gradient-to-r from-amber-600 to-amber-500 text-charcoal-950 font-bold shadow-md'
+                : 'bg-[#12151b] text-charcoal-400 hover:text-white border border-white/5'
             }`}
           >
             {tab.label}
@@ -406,13 +404,13 @@ export function BarManager() {
 
       {/* Stocked Bottles Grid */}
       {loading ? (
-        <div className="py-12 text-center text-charcoal-400 text-xs">Loading bar cart...</div>
+        <div className="py-12 text-center text-charcoal-500 text-xs">Loading bar cart...</div>
       ) : filteredItems.length === 0 ? (
-        <div className="bg-white rounded-2xl p-10 text-center border border-charcoal-200 shadow-xs space-y-2">
-          <Wine className="w-8 h-8 text-amber-700 mx-auto" />
-          <h3 className="text-base font-serif font-bold text-charcoal-900">Your Bar Cart is Empty</h3>
-          <p className="text-xs text-charcoal-500 max-w-sm mx-auto">
-            Take a photo of your liquor shelf or use Quick-Add to stock your bar.
+        <div className="bg-[#12151b] rounded-2xl p-10 text-center border border-amber-900/20 shadow-xl space-y-2">
+          <Wine className="w-8 h-8 text-amber-500 mx-auto" />
+          <h3 className="text-base font-serif font-bold text-white">Your Bar Cart is Empty</h3>
+          <p className="text-xs text-charcoal-400 max-w-sm mx-auto">
+            Take a photo of your liquor shelf or use Quick-Add to stock your speakeasy.
           </p>
         </div>
       ) : (
@@ -420,14 +418,14 @@ export function BarManager() {
           {filteredItems.map((item) => (
             <div
               key={item.id}
-              className="bg-white p-3.5 rounded-2xl border border-charcoal-200/90 shadow-xs flex items-center justify-between gap-3 hover:border-amber-300 transition-colors"
+              className="bg-[#13161c] p-3.5 rounded-2xl border border-white/10 shadow-md flex items-center justify-between gap-3 hover:border-amber-500/40 transition-colors"
             >
               <div className="min-w-0">
-                <h4 className="font-semibold text-xs sm:text-sm text-charcoal-900 truncate">
+                <h4 className="font-semibold text-xs sm:text-sm text-white truncate">
                   {item.name}
                 </h4>
-                <div className="flex items-center gap-2 text-[11px] text-charcoal-500 mt-0.5 capitalize">
-                  <span className="bg-charcoal-100 text-charcoal-700 px-1.5 py-0.2 rounded text-[10px] font-bold">
+                <div className="flex items-center gap-2 text-[11px] text-charcoal-400 mt-0.5 capitalize">
+                  <span className="bg-white/5 text-amber-300 border border-white/5 px-1.5 py-0.2 rounded text-[10px] font-bold font-mono">
                     {item.category?.replace('_', ' ') || 'Bar'}
                   </span>
                   {item.quantity && <span>{item.quantity}</span>}
@@ -436,7 +434,7 @@ export function BarManager() {
 
               <button
                 onClick={() => item.id && handleDeleteItem(item.id)}
-                className="p-1.5 text-charcoal-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 text-charcoal-500 hover:text-red-400 rounded-lg transition-colors cursor-pointer"
                 title="Remove bottle"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -448,29 +446,29 @@ export function BarManager() {
 
       {/* Scan Review Modal */}
       {showReviewModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-charcoal-950/70 backdrop-blur-sm flex justify-center items-start sm:py-8 px-2 sm:px-4">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-amber-900/10 overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95">
-            <div className="p-6 bg-gradient-to-r from-amber-950 via-charcoal-900 to-crimson-950 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex justify-center items-start sm:py-8 px-2 sm:px-4">
+          <div className="bg-[#12151b] w-full max-w-2xl rounded-2xl shadow-2xl border border-amber-900/30 overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95">
+            <div className="p-6 bg-gradient-to-r from-amber-950 via-charcoal-900 to-crimson-950 text-white flex items-center justify-between border-b border-amber-900/30">
               <div>
-                <span className="text-xs uppercase font-bold tracking-widest text-amber-300 bg-white/20 px-2 py-0.5 rounded">
+                <span className="text-xs uppercase font-bold tracking-widest text-amber-300 bg-white/10 px-2 py-0.5 rounded font-mono">
                   Bar Cart Scan
                 </span>
-                <h3 className="text-xl sm:text-2xl font-serif font-bold mt-1">
+                <h3 className="text-xl sm:text-2xl font-serif font-bold mt-1 text-white">
                   Confirm Detected Bottles & Mixers
                 </h3>
-                <p className="text-xs text-amber-100 mt-0.5">
+                <p className="text-xs text-amber-200 mt-0.5">
                   Detected {detectedItems.length} items from your photo.
                 </p>
               </div>
               <button
                 onClick={() => setShowReviewModal(false)}
-                className="p-2 rounded-full bg-black/30 hover:bg-black/50 text-white cursor-pointer"
+                className="p-2 rounded-full bg-black/40 hover:bg-black/60 text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-4 sm:p-6 overflow-y-auto space-y-2.5 flex-1 divide-y divide-charcoal-100">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-2.5 flex-1 divide-y divide-white/5">
               {detectedItems.map((item, idx) => (
                 <div
                   key={idx}
@@ -487,32 +485,32 @@ export function BarManager() {
                           prev.map((it, i) => (i === idx ? { ...it, selected: !it.selected } : it))
                         );
                       }}
-                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                      className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 cursor-pointer bg-black/40 border-white/20"
                     />
                     <div className="min-w-0">
-                      <span className="font-semibold text-sm text-charcoal-900">{item.name}</span>
-                      <p className="text-xs text-charcoal-500 capitalize">{item.category.replace('_', ' ')}</p>
+                      <span className="font-semibold text-sm text-white">{item.name}</span>
+                      <p className="text-xs text-charcoal-400 capitalize">{item.category.replace('_', ' ')}</p>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="p-4 bg-charcoal-50 border-t border-charcoal-200 flex items-center justify-between">
-              <span className="text-xs text-charcoal-600 font-medium">
+            <div className="p-4 bg-[#0e1015] border-t border-white/10 flex items-center justify-between">
+              <span className="text-xs text-charcoal-400 font-medium">
                 {detectedItems.filter((i) => i.selected).length} of {detectedItems.length} selected
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowReviewModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-charcoal-700 hover:bg-charcoal-200 rounded-lg cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold text-charcoal-300 hover:text-white rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveReviewed}
                   disabled={isSaving}
-                  className="px-5 py-2.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl font-bold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-charcoal-950 rounded-xl font-bold text-xs shadow-lg flex items-center gap-1.5 cursor-pointer"
                 >
                   <Check className="w-4 h-4" />
                   {isSaving ? 'Saving...' : 'Add to Bar Cart'}
