@@ -45,6 +45,7 @@ model Cookbook {
   spineSnippet   String?
   verified       Boolean   @default(true)
   totalRecipes   Int       @default(0)
+  bookType       String    @default("cooking") // "cooking", "cocktail", "both"
   userId         String
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   recipes        Recipe[]
@@ -62,7 +63,10 @@ model Recipe {
   servings       String?
   prepTime       String?
   cookTime       String?
-  category       String?       @default("Main")
+  category       String?       @default("Main") // Main, Dessert, Cocktail, Aperitif, etc.
+  glassware      String?       // Coupe, Rocks, Highball, Nick & Nora, Collins, Martini, Tiki Mug
+  ice            String?       // Large Cube, Crushed, Neat, Up, Cubed
+  technique      String?       // Shaken, Stirred, Built, Blended, Muddled
   sourceUrl      String?
   cookbookId     String
   cookbook       Cookbook      @relation(fields: [cookbookId], references: [id], onDelete: Cascade)

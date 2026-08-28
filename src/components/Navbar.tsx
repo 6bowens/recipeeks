@@ -18,6 +18,7 @@ import {
   Layers,
   Zap,
   Shield,
+  Wine,
 } from 'lucide-react';
 
 export function Navbar() {
@@ -73,6 +74,7 @@ export function Navbar() {
     { href: '/library', label: 'Library', icon: BookOpen },
     { href: '/pantry', label: 'Pantry & Fridge', icon: Layers },
     { href: '/match', label: 'Ready to Cook', icon: Sparkles, highlight: true },
+    { href: '/cocktails', label: 'Pour Decisions', icon: Wine },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin', icon: Shield }] : []),
   ];
 

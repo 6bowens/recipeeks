@@ -641,3 +641,90 @@ Output format: Return ONLY a valid JSON array of objects:
   }
 }
 
+/**
+ * Scan one or multiple bar cart / liquor cabinet photos to detect bottles, mixers, and garnishes
+ */
+export async function scanBarCartImage(
+  imageData: string | { base64Data: string; mimeType: string }[],
+  defaultMimeType: string = 'image/jpeg'
+): Promise<{ name: string; category: string; isAlwaysAvailable: boolean }[]> {
+  const genAI = getGeminiClient();
+
+  const images: { base64Data: string; mimeType: string }[] = [];
+  if (typeof imageData === 'string') {
+    if (imageData.trim()) {
+      images.push({ base64Data: imageData, mimeType: defaultMimeType });
+    }
+  } else if (Array.isArray(imageData)) {
+    imageData.forEach((img) => {
+      if (img?.base64Data) {
+        images.push({
+          base64Data: img.base64Data.replace(/^data:image\/[a-z]+;base64,/, ''),
+          mimeType: img.mimeType || 'image/jpeg',
+        });
+      }
+    });
+  }
+
+  if (!genAI || images.length === 0) {
+    return [
+      { name: 'Bourbon Whiskey (Buffalo Trace)', category: 'spirits', isAlwaysAvailable: false },
+      { name: 'London Dry Gin (Tanqueray)', category: 'spirits', isAlwaysAvailable: false },
+      { name: 'Campari', category: 'liqueurs', isAlwaysAvailable: true },
+      { name: 'Sweet Vermouth', category: 'liqueurs', isAlwaysAvailable: true },
+      { name: 'Angostura Bitters', category: 'bitters_syrups', isAlwaysAvailable: true },
+      { name: 'Fresh Lemons', category: 'produce', isAlwaysAvailable: true },
+    ];
+  }
+
+  const prompt = `
+You are an expert mixologist and bar inventory assistant with computer vision capabilities.
+Analyze this photo of a bar cart, liquor cabinet, spirits shelf, or cocktail ingredients setup.
+Detect all visible liquor bottles, base spirits, liqueurs, amari, vermouths, bitters, syrups, mixers, citrus, and bar garnishes.
+
+Categorize each item into strictly one of these categories:
+- "spirits" (Bourbon, Rye, Gin, Tequila, Mezcal, Rum, Vodka, Scotch, Cognac, Brandy, Pisco)
+- "liqueurs" (Campari, Aperol, Triple Sec/Cointreau, Vermouth, Chartreuse, Maraschino, Kahlua, Amaro, St-Germain, Absinthe)
+- "bitters_syrups" (Angostura, Orange Bitters, Peychaud's, Simple Syrup, Demerara, Orgeat, Agave, Grenadine)
+- "mixers" (Club Soda, Tonic Water, Ginger Beer, Cola, Cranberry Juice, Grapefruit Soda)
+- "produce" (Fresh Lemons, Fresh Limes, Oranges, Mint, Basil, Cucumbers)
+- "ice_garnishes" (Cherries, Olives, Citrus Peels, Large Ice Cubes)
+
+Return a strictly valid JSON array of objects with keys:
+- "name": Standardized bottle or ingredient name (include brand if visible, e.g. "Bourbon Whiskey (Woodford Reserve)" or "Campari")
+- "category": One of the 6 categories above
+- "isAlwaysAvailable": boolean (true for universal bar staples like Angostura bitters, simple syrup, lemons, limes, or salt)
+
+Output format: Return ONLY a valid JSON array of objects:
+[
+  { "name": "London Dry Gin (Bombay Sapphire)", "category": "spirits", "isAlwaysAvailable": false },
+  { "name": "Campari", "category": "liqueurs", "isAlwaysAvailable": true },
+  { "name": "Angostura Bitters", "category": "bitters_syrups", "isAlwaysAvailable": true }
+]
+`;
+
+  const imageParts = images.map((img) => ({
+    inlineData: {
+      data: img.base64Data,
+      mimeType: img.mimeType,
+    },
+  }));
+
+  try {
+    const responseText = await generateWithFallback(genAI, [prompt, ...imageParts], {
+      responseMimeType: 'application/json',
+      temperature: 0.2,
+    });
+    const parsed = JSON.parse(responseText);
+    const list = Array.isArray(parsed) ? parsed : [parsed];
+    return list.map((item: any) => ({
+      name: item.name ? item.name.trim() : 'Unknown Bottle',
+      category: item.category || 'spirits',
+      isAlwaysAvailable: !!item.isAlwaysAvailable,
+    }));
+  } catch (error) {
+    console.error('Error scanning bar cart:', error);
+    throw new Error('Failed to analyze bar cart: ' + (error as Error).message);
+  }
+}
+
