@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import {
   BookOpen,
@@ -21,7 +21,7 @@ import {
   Wine,
 } from 'lucide-react';
 
-export function Navbar() {
+function NavbarContent() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const [stats, setStats] = useState<{
@@ -70,14 +70,53 @@ export function Navbar() {
     }
   };
 
+  const searchParams = useSearchParams();
   const isCocktails = pathname.startsWith('/cocktails');
+  const cocktailTab = searchParams.get('tab') || 'bartender';
 
-  const navLinks = [
+  const cookingNavLinks = [
     { href: '/library', label: 'Library', icon: BookOpen },
     { href: '/pantry', label: 'Pantry & Fridge', icon: Layers },
     { href: '/match', label: 'Ready to Cook', icon: Sparkles, highlight: true },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin', icon: Shield }] : []),
   ];
+
+  const cocktailNavLinks = [
+    {
+      href: '/cocktails?tab=bartender',
+      tabId: 'bartender',
+      label: 'Digital Bartender',
+      icon: Sparkles,
+    },
+    {
+      href: '/cocktails?tab=bar_cart',
+      tabId: 'bar_cart',
+      label: 'Bar Cart & Bottles',
+      icon: Wine,
+    },
+    {
+      href: '/',
+      tabId: 'kitchen',
+      label: 'Back to Kitchen',
+      icon: ChefHat,
+    },
+    ...(isAdmin ? [{ href: '/admin', tabId: 'admin', label: 'Admin', icon: Shield }] : []),
+  ];
+
+  const activeLinks = isCocktails ? cocktailNavLinks : cookingNavLinks;
+
+  useEffect(() => {
+    if (session?.user) {
+      fetch('/api/cookbooks')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.stats) {
+            setStats(data.stats);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [session, pathname]);
 
   return (
     <header
@@ -89,7 +128,7 @@ export function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
-          {/* Logo & Brand: Clicking toggles between Kitchen & Speakeasy */}
+          {/* Logo & Brand */}
           <div className="flex items-center gap-6">
             {isCocktails ? (
               <Link
@@ -101,23 +140,15 @@ export function Navbar() {
                   <Wine className="w-5 h-5 text-charcoal-950" />
                 </div>
                 <div className="leading-tight">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xl font-bold font-serif tracking-tight text-amber-300 group-hover:text-amber-200 transition-colors">
-                      Pour Decisions
-                    </span>
-                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-mono">
-                      Speakeasy
-                    </span>
-                  </div>
-                  <span className="block text-[10px] text-charcoal-400 group-hover:text-rose-300 transition-colors">
-                    ↵ Click logo to exit to Kitchen
+                  <span className="text-xl font-bold font-serif tracking-tight text-amber-300 group-hover:text-amber-200 transition-colors">
+                    Pour Decisions
                   </span>
                 </div>
               </Link>
             ) : (
               <Link
                 href="/cocktails"
-                title="🍸 Tap to enter Pour Decisions Speakeasy"
+                title="Click to enter Pour Decisions"
                 className="flex items-center gap-2.5 group cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-800 to-rose-600 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
@@ -126,9 +157,6 @@ export function Navbar() {
                 <div className="leading-tight">
                   <span className="text-xl font-bold font-serif tracking-tight text-charcoal-900 group-hover:text-red-800 transition-colors">
                     Recipeeks
-                  </span>
-                  <span className="block text-[10px] text-charcoal-400 group-hover:text-amber-700 font-mono tracking-tight transition-colors">
-                    🍸 Tap for Speakeasy
                   </span>
                 </div>
               </Link>
@@ -151,9 +179,12 @@ export function Navbar() {
             {/* Desktop Nav Links */}
             <nav className="hidden md:flex items-center gap-1 sm:gap-1.5">
               {session?.user &&
-                navLinks.map((link) => {
+                activeLinks.map((link: any) => {
                   const Icon = link.icon;
-                  const isActive = pathname === link.href;
+                  const isActive = isCocktails
+                    ? link.tabId === cocktailTab
+                    : pathname === link.href;
+
                   return (
                     <Link
                       key={link.href}
@@ -161,10 +192,8 @@ export function Navbar() {
                       className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
                         isCocktails
                           ? isActive
-                            ? 'bg-amber-950 text-amber-300 border border-amber-800/60 shadow-xs'
-                            : link.highlight
-                            ? 'text-amber-200 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-700/40'
-                            : 'text-charcoal-300 hover:text-white hover:bg-white/5'
+                            ? 'bg-amber-500 text-charcoal-950 font-bold shadow-md'
+                            : 'text-charcoal-300 hover:text-white hover:bg-white/10 border border-transparent'
                           : isActive
                           ? 'bg-red-50 text-red-900 shadow-xs'
                           : link.highlight
@@ -172,7 +201,7 @@ export function Navbar() {
                           : 'text-charcoal-600 hover:text-charcoal-900 hover:bg-charcoal-100/70'
                       }`}
                     >
-                      <Icon className={`w-3.5 h-3.5 ${link.highlight ? (isCocktails ? 'text-amber-400' : 'text-red-700') : ''}`} />
+                      <Icon className={`w-3.5 h-3.5 ${link.highlight ? 'text-red-700' : ''}`} />
                       <span>{link.label}</span>
                     </Link>
                   );
@@ -258,17 +287,28 @@ export function Navbar() {
 
         {/* Mobile dropdown */}
         {mobileMenuOpen && session?.user && (
-          <div className="md:hidden py-3 border-t border-charcoal-200 space-y-1 animate-in fade-in">
-            {navLinks.map((link) => {
+          <div
+            className={`md:hidden py-3 border-t space-y-1 animate-in fade-in ${
+              isCocktails ? 'border-amber-900/30' : 'border-charcoal-200'
+            }`}
+          >
+            {activeLinks.map((link: any) => {
               const Icon = link.icon;
-              const isActive = pathname === link.href;
+              const isActive = isCocktails
+                ? link.tabId === cocktailTab
+                : pathname === link.href;
+
               return (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium ${
-                    isActive
+                    isCocktails
+                      ? isActive
+                        ? 'bg-amber-500 text-charcoal-950 font-bold'
+                        : 'text-charcoal-300 hover:bg-white/5'
+                      : isActive
                       ? 'bg-red-50 text-red-950 font-bold'
                       : 'text-charcoal-700 hover:bg-charcoal-100'
                   }`}
@@ -287,5 +327,13 @@ export function Navbar() {
         )}
       </div>
     </header>
+  );
+}
+
+export function Navbar() {
+  return (
+    <Suspense fallback={<header className="h-16 bg-white/95 border-b border-charcoal-200/80" />}>
+      <NavbarContent />
+    </Suspense>
   );
 }
