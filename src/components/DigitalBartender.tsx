@@ -122,6 +122,8 @@ export function DigitalBartender() {
     setResults(null);
   };
 
+  const [resultFilter, setResultFilter] = useState<'all' | 'books' | 'digital'>('all');
+
   return (
     <div className="space-y-6">
       {/* Wizard Progress & Speakeasy Intro */}
@@ -138,7 +140,7 @@ export function DigitalBartender() {
             What are you in the mood to sip?
           </h2>
           <p className="text-xs sm:text-sm text-charcoal-300 mt-1 max-w-xl">
-            Answer 3 quick questions. We&apos;ll check your physical cocktail books first for an exact page match, then fall back to curated craft classics using your bottles.
+            Answer 3 quick questions. We&apos;ll check your physical cocktail books first for an exact page match, then add curated digital craft classics using your bottles.
           </p>
         </div>
 
@@ -335,7 +337,7 @@ export function DigitalBartender() {
         </div>
       )}
 
-      {/* STEP 4: RECOMMENDATIONS RESULTS (2-TIER RESOLUTION) */}
+      {/* STEP 4: RECOMMENDATIONS RESULTS (COMBINED BLENDED STREAM) */}
       {step === 4 && (
         <div className="space-y-6 animate-in fade-in">
           {loading ? (
@@ -347,48 +349,105 @@ export function DigitalBartender() {
                 Searching Your Cocktail Books & Bar Cart...
               </h3>
               <p className="text-xs text-charcoal-400 max-w-md mx-auto">
-                Comparing your active spirits inventory against your indexed physical books first, then pulling verified craft specs.
+                Scanning your physical book collection first, then blending in digital craft recipes matched to your bottles.
               </p>
             </div>
           ) : results ? (
             <div className="space-y-6">
-              {/* TIER 1: Personal Books Matches */}
-              {results.libraryMatches && results.libraryMatches.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5">
-                      <BookOpen className="w-3.5 h-3.5 text-amber-300" /> Tier 1: From Your Library Books
+              {/* Filter Pills & Summary Bar */}
+              <div className="bg-[#12151b] border border-amber-900/30 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+                <div>
+                  <h3 className="text-base font-serif font-bold text-white flex items-center gap-2">
+                    <span>Curated Mixology Specs</span>
+                    <span className="text-xs font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                      {(results.libraryMatches?.length || 0) + (results.webClassicMatches?.length || 0)} Cocktails
                     </span>
-                    <span className="text-xs text-charcoal-400">Found in your physical cocktail collection</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {results.libraryMatches.map((drink) => (
-                      <CocktailCard key={drink.id} cocktail={drink} />
-                    ))}
-                  </div>
+                  </h3>
+                  <p className="text-xs text-charcoal-400 mt-0.5">
+                    {results.libraryMatches && results.libraryMatches.length > 0
+                      ? `Found ${results.libraryMatches.length} in your books + ${results.webClassicMatches.length} digital craft matches.`
+                      : `0 physical book matches — showing ${results.webClassicMatches.length} digital craft matches for your bar.`}
+                  </p>
                 </div>
-              )}
 
-              {/* TIER 2: Web & Classic Specs Fallback */}
-              {results.webClassicMatches && results.webClassicMatches.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 pt-2">
-                    <span className="bg-blue-500/20 border border-blue-400/40 text-blue-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5">
-                      <Globe className="w-3.5 h-3.5 text-blue-300" /> Tier 2: Classic & Speakeasy Specs
-                    </span>
-                    <span className="text-xs text-charcoal-400">
-                      IBA & craft recipes matched to your available bottles
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {results.webClassicMatches.map((drink) => (
-                      <CocktailCard key={drink.id} cocktail={drink} />
-                    ))}
-                  </div>
+                {/* Filter Switcher */}
+                <div className="flex items-center gap-1 bg-[#181c25] p-1 rounded-xl border border-white/5 text-xs">
+                  <button
+                    onClick={() => setResultFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                      resultFilter === 'all'
+                        ? 'bg-amber-500 text-charcoal-950 shadow-sm'
+                        : 'text-charcoal-400 hover:text-white'
+                    }`}
+                  >
+                    All ({(results.libraryMatches?.length || 0) + (results.webClassicMatches?.length || 0)})
+                  </button>
+                  <button
+                    onClick={() => setResultFilter('books')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                      resultFilter === 'books'
+                        ? 'bg-amber-500 text-charcoal-950 shadow-sm'
+                        : 'text-charcoal-400 hover:text-white'
+                    }`}
+                  >
+                    📖 Books ({results.libraryMatches?.length || 0})
+                  </button>
+                  <button
+                    onClick={() => setResultFilter('digital')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                      resultFilter === 'digital'
+                        ? 'bg-amber-500 text-charcoal-950 shadow-sm'
+                        : 'text-charcoal-400 hover:text-white'
+                    }`}
+                  >
+                    🌐 Digital ({results.webClassicMatches?.length || 0})
+                  </button>
                 </div>
-              )}
+              </div>
+
+              {/* STREAM 1: Physical Book Matches First */}
+              {(resultFilter === 'all' || resultFilter === 'books') &&
+                results.libraryMatches &&
+                results.libraryMatches.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 font-mono">
+                        <BookOpen className="w-3.5 h-3.5 text-amber-300" /> Physical Books in Your Library
+                      </span>
+                      <span className="text-xs text-charcoal-400">
+                        {results.libraryMatches.length} recipe(s) found in your physical collection
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {results.libraryMatches.map((drink) => (
+                        <CocktailCard key={drink.id} cocktail={drink} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* STREAM 2: Digital Craft & Web Classics (Filling out the page) */}
+              {(resultFilter === 'all' || resultFilter === 'digital') &&
+                results.webClassicMatches &&
+                results.webClassicMatches.length > 0 && (
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-blue-500/20 border border-blue-400/40 text-blue-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 font-mono">
+                        <Globe className="w-3.5 h-3.5 text-blue-300" /> Digital & Speakeasy Classics
+                      </span>
+                      <span className="text-xs text-charcoal-400">
+                        {results.webClassicMatches.length} craft recipes matched to your bar cart
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {results.webClassicMatches.map((drink) => (
+                        <CocktailCard key={drink.id} cocktail={drink} />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
               {(!results.libraryMatches || results.libraryMatches.length === 0) &&
                 (!results.webClassicMatches || results.webClassicMatches.length === 0) && (

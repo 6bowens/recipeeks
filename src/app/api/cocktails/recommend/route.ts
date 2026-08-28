@@ -150,24 +150,7 @@ export async function POST(req: Request) {
     libraryMatches.sort((a, b) => b.matchScore - a.matchScore);
 
     // 3. TIER 2: Curated Classic & Modern Web Speakeasy Database
-    const webClassicMatches: CocktailRecommendationResult[] = [];
-
-    for (const classic of CLASSIC_COCKTAILS) {
-      // Filter by spirit if specified
-      if (spiritBase && spiritBase !== 'Any') {
-        const target = spiritBase.toLowerCase();
-        if (!classic.spiritBase.toLowerCase().includes(target) && !classic.name.toLowerCase().includes(target)) {
-          continue;
-        }
-      }
-
-      // Filter by flavor profile if specified
-      if (flavorProfile && flavorProfile !== 'Any') {
-        if (classic.flavorProfile !== flavorProfile.toLowerCase()) {
-          continue;
-        }
-      }
-
+    const formatClassic = (classic: typeof CLASSIC_COCKTAILS[0]) => {
       const matched: string[] = [];
       const missing: string[] = [];
 
@@ -188,10 +171,10 @@ export async function POST(req: Request) {
 
       const score = Math.round((matched.length / classic.ingredients.length) * 100);
 
-      webClassicMatches.push({
+      return {
         id: `web-${classic.id}`,
         name: classic.name,
-        source: 'web_classic',
+        source: 'web_classic' as const,
         spiritBase: classic.spiritBase,
         flavorProfile: classic.flavorProfile,
         glassware: classic.glassware,
@@ -204,12 +187,55 @@ export async function POST(req: Request) {
         instructions: classic.instructions,
         garnish: classic.garnish,
         description: classic.description,
-      });
+      };
+    };
+
+    const directMatches = CLASSIC_COCKTAILS.filter((classic) => {
+      if (spiritBase && spiritBase !== 'Any') {
+        const target = spiritBase.toLowerCase();
+        if (!classic.spiritBase.toLowerCase().includes(target) && !classic.name.toLowerCase().includes(target)) {
+          return false;
+        }
+      }
+      if (flavorProfile && flavorProfile !== 'Any') {
+        if (classic.flavorProfile !== flavorProfile.toLowerCase()) {
+          return false;
+        }
+      }
+      return true;
+    }).map(formatClassic);
+
+    // If fewer than 4 direct matches, expand with same-spirit or high-match classics
+    const addedIds = new Set(directMatches.map((m) => m.id));
+    const secondaryMatches: CocktailRecommendationResult[] = [];
+
+    for (const classic of CLASSIC_COCKTAILS) {
+      if (addedIds.has(`web-${classic.id}`)) continue;
+      if (spiritBase && spiritBase !== 'Any') {
+        const target = spiritBase.toLowerCase();
+        if (classic.spiritBase.toLowerCase().includes(target) || classic.name.toLowerCase().includes(target)) {
+          secondaryMatches.push(formatClassic(classic));
+          addedIds.add(`web-${classic.id}`);
+        }
+      }
     }
 
-    webClassicMatches.sort((a, b) => b.matchScore - a.matchScore);
+    // If still under 6, add highest overall bar-match classic cocktails
+    if (directMatches.length + secondaryMatches.length < 6) {
+      for (const classic of CLASSIC_COCKTAILS) {
+        if (addedIds.has(`web-${classic.id}`)) continue;
+        secondaryMatches.push(formatClassic(classic));
+        addedIds.add(`web-${classic.id}`);
+        if (directMatches.length + secondaryMatches.length >= 8) break;
+      }
+    }
 
-    // Combine Tier 1 & Tier 2: Library matches first!
+    directMatches.sort((a, b) => b.matchScore - a.matchScore);
+    secondaryMatches.sort((a, b) => b.matchScore - a.matchScore);
+
+    const webClassicMatches = [...directMatches, ...secondaryMatches].slice(0, 8);
+
+    // Combine Tier 1 & Tier 2: Library matches first, followed by 4-6 digital craft specs
     return NextResponse.json({
       success: true,
       libraryCount: libraryMatches.length,
