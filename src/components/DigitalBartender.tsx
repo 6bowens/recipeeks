@@ -27,7 +27,7 @@ const SPIRIT_OPTIONS = [
   { id: 'Bourbon', label: 'Bourbon / Rye', icon: '🥃', desc: 'Warm oak, caramel & rye spice' },
   { id: 'Gin', label: 'Gin', icon: '🍸', desc: 'Crisp botanicals & piney juniper' },
   { id: 'Tequila', label: 'Tequila / Mezcal', icon: '🌵', desc: 'Agave, smoke & earth' },
-  { id: 'Rum', label: 'Rum', icon: '🍹', desc: 'Sugarcane, molasses & tiki' },
+  { id: 'Rum', label: 'Rum', icon: '🍹', desc: 'Sugarcane, molasses & tropical fruit' },
   { id: 'Vodka', label: 'Vodka', icon: '🧊', desc: 'Clean, versatile & neutral' },
   { id: 'Brandy', label: 'Brandy / Cognac', icon: '🍇', desc: 'Rich fruit & aged oak' },
   { id: 'Any', label: 'Surprise Me', icon: '✨', desc: 'Anything in my bar cart' },
@@ -38,7 +38,7 @@ const FLAVOR_PROFILES = [
     id: 'boozy',
     label: 'Spirit-Forward & Boozy',
     icon: '🥃',
-    desc: 'Deep, warming stirred classics like Old Fashioned, Manhattan & Oaxacan',
+    desc: 'Deep, warming stirred drinks like Old Fashioned, Manhattan & Oaxacan',
   },
   {
     id: 'sour',
@@ -80,9 +80,30 @@ const FLAVOR_PROFILES = [
 
 const COMPLEXITY_LEVELS = [
   { id: 'quick', label: 'Quick & Simple', desc: '3 ingredients or less, zero fuss' },
-  { id: 'classic', label: 'Classic Shaken / Stirred', desc: 'Standard craft speakeasy bar specs' },
-  { id: 'craft', label: 'Craft Speakeasy', desc: 'Multi-layer craft cocktail experience' },
+  { id: 'classic', label: 'Classic Shaken / Stirred', desc: 'Standard craft cocktail specs' },
+  { id: 'craft', label: 'Craft Cocktail', desc: 'Multi-layer craft cocktail experience' },
 ];
+
+function getFlavorBadge(flavorProfile?: string) {
+  switch (flavorProfile?.toLowerCase()) {
+    case 'boozy':
+      return { icon: '🥃', label: 'Spirit-Forward' };
+    case 'sour':
+      return { icon: '🍋', label: 'Crisp & Sour' };
+    case 'bitter':
+      return { icon: '🍊', label: 'Bitter & Aperitivo' };
+    case 'highball':
+      return { icon: '🫧', label: 'Fizzy Highball' };
+    case 'tiki':
+      return { icon: '🍍', label: 'Tropical & Tiki' };
+    case 'herbal':
+      return { icon: '🌿', label: 'Herbal & Botanical' };
+    case 'dessert':
+      return { icon: '☕', label: 'Rich & Decadent' };
+    default:
+      return { icon: '🍸', label: 'Cocktail' };
+  }
+}
 
 export function DigitalBartender() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -91,7 +112,7 @@ export function DigitalBartender() {
   const [selectedComplexity, setSelectedComplexity] = useState<string>('classic');
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [addingIng, setAddingIng] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [results, setResults] = useState<{
@@ -118,7 +139,7 @@ export function DigitalBartender() {
       if (!res.ok) throw new Error('Failed to find recommendations');
       const data = await res.json();
       setResults(data.recommendations);
-      setHasMore(!!data.hasMore);
+      setHasMore(true);
     } catch (err) {
       alert('Error finding cocktails: ' + (err as Error).message);
     } finally {
@@ -151,10 +172,13 @@ export function DigitalBartender() {
         if (!prev) return prev;
         const existingIds = new Set(prev.webClassicMatches.map((i) => i.id));
         const filteredNew = newItems.filter((i: CocktailRecommendationResult) => !existingIds.has(i.id));
-        const itemsToAdd = filteredNew.length > 0 ? filteredNew : newItems.map((it: CocktailRecommendationResult, idx: number) => ({
-          ...it,
-          id: `${it.id}-more-${Date.now()}-${idx}`
-        }));
+        const itemsToAdd =
+          filteredNew.length > 0
+            ? filteredNew
+            : newItems.map((it: CocktailRecommendationResult, idx: number) => ({
+                ...it,
+                id: `${it.id}-more-${Date.now()}-${idx}`,
+              }));
         return {
           ...prev,
           webClassicMatches: [...prev.webClassicMatches, ...itemsToAdd],
@@ -243,7 +267,7 @@ export function DigitalBartender() {
   const resetWizard = () => {
     setStep(1);
     setResults(null);
-    setHasMore(false);
+    setHasMore(true);
   };
 
   const [resultFilter, setResultFilter] = useState<'all' | 'books' | 'digital'>('all');
@@ -258,21 +282,15 @@ export function DigitalBartender() {
         </div>
       )}
 
-      {/* Wizard Progress & Speakeasy Intro */}
+      {/* Hero Header */}
       <div className="bg-gradient-to-r from-[#12151c] via-[#1a171d] to-[#12151c] rounded-3xl p-6 sm:p-8 text-white shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-amber-900/30 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 shadow-sm">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" /> The Digital Bartender
-            </span>
-            <span className="text-xs text-amber-400/70 font-serif italic">Speakeasy Q&A Sommelier</span>
-          </div>
           <h2 className="text-2xl sm:text-3xl font-serif font-bold text-white leading-tight">
             What are you in the mood to sip?
           </h2>
           <p className="text-xs sm:text-sm text-charcoal-400 max-w-2xl mt-1">
-            Answer 3 quick sensory questions. Recipeeks pairs your craving with cocktail books in your library and matches with your bar cart.
+            Answer 3 quick sensory questions to pair your craving with cocktails from your library and bar cart.
           </p>
         </div>
 
@@ -359,7 +377,7 @@ export function DigitalBartender() {
             <h3 className="text-xl font-serif font-bold text-white mt-0.5">
               What flavor profile are you craving?
             </h3>
-            <p className="text-xs text-charcoal-400">Choose the sensory character and mood of your cocktail.</p>
+            <p className="text-xs text-charcoal-400">Choose the sensory character and taste profile of your cocktail.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -462,7 +480,7 @@ export function DigitalBartender() {
               className="px-8 py-3.5 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-charcoal-950 font-extrabold text-sm rounded-xl shadow-xl flex items-center gap-2 cursor-pointer transition-all hover:scale-105"
             >
               <Sparkles className="w-4 h-4 fill-charcoal-950" />
-              <span>Shake Up Recommendations</span>
+              <span>Get Cocktail Recommendations</span>
             </button>
           </div>
         </div>
@@ -477,7 +495,7 @@ export function DigitalBartender() {
                 <GlassWater className="w-8 h-8" />
               </div>
               <h3 className="text-xl font-serif font-bold text-white">
-                Crafting Your Tailored Speakeasy Menu...
+                Finding Matching Cocktails...
               </h3>
               <p className="text-xs text-charcoal-400 max-w-md mx-auto">
                 Consulting your indexed cocktail books and cross-referencing your active bar cart bottles.
@@ -518,7 +536,7 @@ export function DigitalBartender() {
                           : 'text-charcoal-400 hover:text-white'
                       }`}
                     >
-                      🌐 Digital ({results.webClassicMatches?.length || 0})
+                      🌐 Curated ({results.webClassicMatches?.length || 0})
                     </button>
                   </div>
                 </div>
@@ -528,7 +546,7 @@ export function DigitalBartender() {
                   className="text-xs font-semibold text-amber-400 hover:text-amber-300 flex items-center gap-1.5 cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Change Survey Options</span>
+                  <span>Change Options</span>
                 </button>
               </div>
 
@@ -539,7 +557,7 @@ export function DigitalBartender() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 font-mono">
-                        <BookOpen className="w-3.5 h-3.5 text-amber-300" /> Physical Books in Your Library
+                        <BookOpen className="w-3.5 h-3.5 text-amber-300" /> Books in Your Library
                       </span>
                       <span className="text-xs text-charcoal-400">
                         {results.libraryMatches.length} recipe(s) found in your physical collection
@@ -559,17 +577,17 @@ export function DigitalBartender() {
                   </div>
                 )}
 
-              {/* STREAM 2: Digital Craft & Web Classics (Curated strictly to survey) */}
+              {/* STREAM 2: Curated Web Specs (Strictly aligned to taste profile) */}
               {(resultFilter === 'all' || resultFilter === 'digital') &&
                 results.webClassicMatches &&
                 results.webClassicMatches.length > 0 && (
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center gap-2">
-                      <span className="bg-blue-500/20 border border-blue-400/40 text-blue-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 font-mono">
-                        <Globe className="w-3.5 h-3.5 text-blue-300" /> Curated Craft Classics
+                      <span className="bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 font-mono">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Curated Recipes ({results.webClassicMatches[0]?.flavorProfile || selectedFlavor})
                       </span>
                       <span className="text-xs text-charcoal-400">
-                        Showing {results.webClassicMatches.length} speakeasy recipes tailored to your choices & bar cart
+                        Showing recipes tailored to your taste profile & bar cart
                       </span>
                     </div>
 
@@ -584,7 +602,7 @@ export function DigitalBartender() {
                       ))}
                     </div>
 
-                    {/* Load 6 More Cocktails Button */}
+                    {/* Endless Load 6 More Cocktails Button */}
                     {hasMore && (
                       <div className="flex justify-center pt-5 pb-2">
                         <button
@@ -637,10 +655,12 @@ function CocktailCard({
   onQuickAdd: (ingredientName: string) => void;
   addingIng: string | null;
 }) {
+  const flavorBadge = getFlavorBadge(cocktail.flavorProfile);
+
   return (
     <div className="bg-[#13161c] rounded-2xl border border-white/10 p-5 shadow-xl flex flex-col justify-between hover:border-amber-500/40 transition-colors">
       <div>
-        {/* Header Badges */}
+        {/* Header Badges: Dynamic Taste Profile & Spirit */}
         <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
           <div className="flex items-center gap-1.5">
             {cocktail.source === 'library' ? (
@@ -648,8 +668,9 @@ function CocktailCard({
                 <BookOpen className="w-3 h-3 text-amber-300" /> {cocktail.bookTitle || 'Library'} {cocktail.pageNumber ? `· p. ${cocktail.pageNumber}` : ''}
               </span>
             ) : (
-              <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
-                <Globe className="w-3 h-3 text-blue-300" /> Classic Spec
+              <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
+                <span>{flavorBadge.icon}</span>
+                <span>{flavorBadge.label}</span>
               </span>
             )}
 

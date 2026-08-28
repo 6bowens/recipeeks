@@ -53,7 +53,7 @@ function NavbarContent() {
     {
       href: '/cocktails?tab=bartender',
       tabId: 'bartender',
-      label: 'Digital Bartender',
+      label: 'Cocktails',
       icon: Sparkles,
     },
     {
