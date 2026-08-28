@@ -2,6 +2,7 @@ import './globals.css';
 import { Providers } from '@/components/Providers';
 import { Navbar } from '@/components/Navbar';
 import { ImpersonationBanner } from '@/components/ImpersonationBanner';
+import { AppShell } from '@/components/AppShell';
 
 export const metadata = {
   title: 'Recipeeks — Digitize Cookbooks & Match Pantry Ingredients',
@@ -15,13 +16,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen flex flex-col bg-[#faf8f5] text-[#2d2d2d] antialiased selection:bg-amber-200">
+      <body className="min-h-screen flex flex-col antialiased selection:bg-amber-200">
         <Providers>
-          <ImpersonationBanner />
-          <Navbar />
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-            {children}
-          </main>
+          <AppShell>
+            <ImpersonationBanner />
+            <Navbar />
+            <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+              {children}
+            </main>
+          </AppShell>
         </Providers>
       </body>
     </html>
