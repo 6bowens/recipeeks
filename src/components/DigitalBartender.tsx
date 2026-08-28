@@ -90,6 +90,8 @@ export function DigitalBartender() {
   const [selectedFlavor, setSelectedFlavor] = useState<string>('sour');
   const [selectedComplexity, setSelectedComplexity] = useState<string>('classic');
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [addingIng, setAddingIng] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [results, setResults] = useState<{
@@ -108,16 +110,58 @@ export function DigitalBartender() {
           spiritBase: selectedSpirit,
           flavorProfile: selectedFlavor,
           complexity: selectedComplexity,
+          limit: 6,
+          offset: 0,
         }),
       });
 
       if (!res.ok) throw new Error('Failed to find recommendations');
       const data = await res.json();
       setResults(data.recommendations);
+      setHasMore(!!data.hasMore);
     } catch (err) {
       alert('Error finding cocktails: ' + (err as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (!results || loadingMore) return;
+    try {
+      setLoadingMore(true);
+      const currentOffset = results.webClassicMatches?.length || 0;
+      const res = await fetch('/api/cocktails/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          spiritBase: selectedSpirit,
+          flavorProfile: selectedFlavor,
+          complexity: selectedComplexity,
+          limit: 6,
+          offset: currentOffset,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to load more cocktails');
+      const data = await res.json();
+      const newItems = data.recommendations?.webClassicMatches || [];
+
+      setResults((prev) => {
+        if (!prev) return prev;
+        const existingIds = new Set(prev.webClassicMatches.map((i) => i.id));
+        const filteredNew = newItems.filter((i: CocktailRecommendationResult) => !existingIds.has(i.id));
+        return {
+          ...prev,
+          webClassicMatches: [...prev.webClassicMatches, ...filteredNew],
+        };
+      });
+
+      setHasMore(!!data.hasMore);
+    } catch (err) {
+      alert('Error loading more cocktails: ' + (err as Error).message);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -195,6 +239,7 @@ export function DigitalBartender() {
   const resetWizard = () => {
     setStep(1);
     setResults(null);
+    setHasMore(false);
   };
 
   const [resultFilter, setResultFilter] = useState<'all' | 'books' | 'digital'>('all');
@@ -520,7 +565,7 @@ export function DigitalBartender() {
                         <Globe className="w-3.5 h-3.5 text-blue-300" /> Curated Craft Classics
                       </span>
                       <span className="text-xs text-charcoal-400">
-                        {results.webClassicMatches.length} speakeasy recipes tailored to your choices & bar cart
+                        Showing {results.webClassicMatches.length} speakeasy recipes tailored to your choices & bar cart
                       </span>
                     </div>
 
@@ -534,6 +579,29 @@ export function DigitalBartender() {
                         />
                       ))}
                     </div>
+
+                    {/* Load 6 More Cocktails Button */}
+                    {hasMore && (
+                      <div className="flex justify-center pt-5 pb-2">
+                        <button
+                          onClick={handleLoadMore}
+                          disabled={loadingMore}
+                          className="px-6 py-3 bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-400 text-charcoal-950 font-extrabold text-xs rounded-xl shadow-xl flex items-center gap-2 cursor-pointer transition-all hover:scale-105"
+                        >
+                          {loadingMore ? (
+                            <>
+                              <RotateCcw className="w-4 h-4 animate-spin" />
+                              <span>Pouring 6 More Specs...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-4 h-4 stroke-[3]" />
+                              <span>Load 6 More Cocktails</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 

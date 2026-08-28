@@ -29,6 +29,8 @@ export const BAR_STAPLES = [
   'Honey-Ginger Syrup',
   'Agave Nectar',
   'Agave Syrup',
+  'Grenadine',
+  'Orgeat (Almond Syrup)',
   'Fresh Lemon Juice',
   'Fresh Lemon',
   'Fresh Lime Juice',
@@ -64,7 +66,9 @@ export function deduceBarCategory(name: string): string {
     norm.includes('agave') ||
     norm.includes('grenadine') ||
     norm.includes('orgeat') ||
-    norm.includes('honey')
+    norm.includes('honey') ||
+    norm.includes('passion fruit syrup') ||
+    norm.includes('raspberry syrup')
   ) {
     return 'bitters_syrups';
   }
@@ -104,6 +108,7 @@ export function deduceBarCategory(name: string): string {
     norm.includes('nonino') ||
     norm.includes('averna') ||
     norm.includes('montenegro') ||
+    norm.includes('cynar') ||
     norm.includes('kahlua') ||
     norm.includes('kahlúa') ||
     norm.includes('coffee liqueur') ||
@@ -115,7 +120,11 @@ export function deduceBarCategory(name: string): string {
     norm.includes('amaretto') ||
     norm.includes('chambord') ||
     norm.includes('cassis') ||
-    norm.includes('fernet')
+    norm.includes('fernet') ||
+    norm.includes('drambuie') ||
+    norm.includes('heering') ||
+    norm.includes('creme de') ||
+    norm.includes('crème de')
   ) {
     return 'liqueurs';
   }
@@ -133,7 +142,9 @@ export function deduceBarCategory(name: string): string {
     norm.includes('pineapple') ||
     norm.includes('berry') ||
     norm.includes('raspberry') ||
-    norm.includes('blackberry')
+    norm.includes('blackberry') ||
+    norm.includes('cherry') ||
+    norm.includes('cherries')
   ) {
     return 'produce';
   }
@@ -149,15 +160,14 @@ export function deduceBarCategory(name: string): string {
     norm.includes('coke') ||
     norm.includes('prosecco') ||
     norm.includes('champagne') ||
-    norm.includes('sparkling wine')
+    norm.includes('sparkling wine') ||
+    norm.includes('tomato juice')
   ) {
     return 'mixers';
   }
 
   // 6. Ice, Garnishes & Pantry
   if (
-    norm.includes('cherry') ||
-    norm.includes('cherries') ||
     norm.includes('olive') ||
     norm.includes('egg white') ||
     norm.includes('aquafaba') ||
@@ -166,7 +176,9 @@ export function deduceBarCategory(name: string): string {
     norm.includes('nutmeg') ||
     norm.includes('salt') ||
     norm.includes('sugar') ||
-    norm.includes('ice')
+    norm.includes('ice') ||
+    norm.includes('coconut cream') ||
+    norm.includes('coco lopez')
   ) {
     return 'ice_garnishes';
   }
@@ -340,9 +352,78 @@ export const CLASSIC_COCKTAILS: ClassicCocktailSpec[] = [
     garnish: 'Lime Wheel',
     description: 'Joaquín Simó modern classic—equal parts smoky, bittersweet, herbal, and citrus harmony.',
   },
+  {
+    id: 'mexican-firing-squad',
+    name: 'Mexican Firing Squad',
+    spiritBase: 'Tequila / Mezcal',
+    flavorProfiles: ['sour', 'herbal'],
+    complexity: 'classic',
+    glassware: 'Rocks Glass',
+    ice: 'Crushed or Cubed Ice',
+    technique: 'Shaken',
+    ingredients: [
+      { name: 'Blanco or Reposado Tequila', amount: '2', unit: 'oz' },
+      { name: 'Fresh Lime Juice', amount: '0.75', unit: 'oz' },
+      { name: 'Grenadine (Pomegranate Syrup)', amount: '0.75', unit: 'oz' },
+      { name: 'Angostura Bitters', amount: '4-5', unit: 'dashes' },
+    ],
+    instructions: [
+      'Combine tequila, lime juice, grenadine, and aromatic bitters in a shaker with ice.',
+      'Shake hard for 15 seconds.',
+      'Strain into a rocks glass over fresh ice.',
+    ],
+    garnish: 'Lime Wheel & Brandied Cherry',
+    description: '1937 Mexico City classic—ruby pomegranate and bold aromatic bitters elevate agave tequila.',
+  },
+  {
+    id: 'el-diablo',
+    name: 'El Diablo',
+    spiritBase: 'Tequila / Mezcal',
+    flavorProfiles: ['highball', 'sour'],
+    complexity: 'classic',
+    glassware: 'Highball Glass',
+    ice: 'Cubed Ice',
+    technique: 'Shaken & Topped',
+    ingredients: [
+      { name: 'Reposado Tequila', amount: '1.5', unit: 'oz' },
+      { name: 'Crème de Cassis (Blackcurrant Liqueur)', amount: '0.5', unit: 'oz' },
+      { name: 'Fresh Lime Juice', amount: '0.5', unit: 'oz' },
+      { name: 'Ginger Beer', amount: '3-4', unit: 'oz' },
+    ],
+    instructions: [
+      'Shake tequila, crème de cassis, and lime juice with ice.',
+      'Strain into a tall highball glass filled with ice.',
+      'Top with spicy ginger beer and gently stir once.',
+    ],
+    garnish: 'Lime Wedge & Candied Ginger',
+    description: 'Trader Vic\'s 1940s agave highball—spicy ginger beer and dark blackcurrant liqueur.',
+  },
+  {
+    id: 'rosita',
+    name: 'The Rosita',
+    spiritBase: 'Tequila / Mezcal',
+    flavorProfiles: ['bitter', 'boozy'],
+    complexity: 'craft',
+    glassware: 'Rocks Glass or Coupe',
+    ice: 'Large Ice Cube or Up',
+    technique: 'Stirred',
+    ingredients: [
+      { name: 'Reposado Tequila', amount: '1.5', unit: 'oz' },
+      { name: 'Campari', amount: '0.5', unit: 'oz' },
+      { name: 'Sweet Vermouth', amount: '0.5', unit: 'oz' },
+      { name: 'Dry Vermouth', amount: '0.5', unit: 'oz' },
+      { name: 'Angostura Bitters', amount: '1', unit: 'dash' },
+    ],
+    instructions: [
+      'Stir all ingredients in a mixing glass with plenty of ice for 30 seconds.',
+      'Strain over a large ice block in a rocks glass.',
+    ],
+    garnish: 'Expressed Lemon or Orange Peel',
+    description: 'The elegant split-vermouth agave Negroni rediscovered by Gary Regan.',
+  },
 
   // ==========================================
-  // BOURBON / RYE
+  // BOURBON / RYE / WHISKEY
   // ==========================================
   {
     id: 'old-fashioned',
@@ -530,6 +611,75 @@ export const CLASSIC_COCKTAILS: ClassicCocktailSpec[] = [
     garnish: 'Lemon Wheel',
     description: 'Milk & Honey modern classic—a silky bourbon sour kissed with rich wildflower honey.',
   },
+  {
+    id: 'vieux-carre',
+    name: 'Vieux Carré',
+    spiritBase: 'Bourbon / Rye',
+    flavorProfiles: ['boozy', 'herbal'],
+    complexity: 'craft',
+    glassware: 'Rocks Glass',
+    ice: 'Large Ice Cube',
+    technique: 'Stirred',
+    ingredients: [
+      { name: 'Rye Whiskey', amount: '0.75', unit: 'oz' },
+      { name: 'Cognac or Brandy', amount: '0.75', unit: 'oz' },
+      { name: 'Sweet Vermouth', amount: '0.75', unit: 'oz' },
+      { name: 'Bénédictine Liqueur', amount: '1', unit: 'barspoon' },
+      { name: 'Peychaud\'s Bitters', amount: '1', unit: 'dash' },
+      { name: 'Angostura Bitters', amount: '1', unit: 'dash' },
+    ],
+    instructions: [
+      'Combine all ingredients in a mixing glass with plenty of ice.',
+      'Stir for 30 seconds until well-chilled.',
+      'Strain into a rocks glass over a single large ice cube.',
+    ],
+    garnish: 'Lemon Twist or Brandied Cherry',
+    description: '1930s Hotel Monteleone masterpiece from the French Quarter of New Orleans.',
+  },
+  {
+    id: 'black-manhattan',
+    name: 'Black Manhattan',
+    spiritBase: 'Bourbon / Rye',
+    flavorProfiles: ['boozy', 'bitter'],
+    complexity: 'classic',
+    glassware: 'Coupe or Nick & Nora',
+    ice: 'Served Up',
+    technique: 'Stirred',
+    ingredients: [
+      { name: 'Rye Whiskey', amount: '2', unit: 'oz' },
+      { name: 'Amaro Averna', amount: '1', unit: 'oz' },
+      { name: 'Angostura Bitters', amount: '1', unit: 'dash' },
+      { name: 'Orange Bitters', amount: '1', unit: 'dash' },
+    ],
+    instructions: [
+      'Stir rye whiskey, Amaro Averna, and bitters with ice for 30 seconds.',
+      'Strain into a chilled coupe glass.',
+    ],
+    garnish: 'Luxardo Cherry',
+    description: 'Modern classic created by Todd Smith at Bourbon & Branch in SF—replacing vermouth with Sicilian amaro.',
+  },
+  {
+    id: 'brown-derby',
+    name: 'Brown Derby',
+    spiritBase: 'Bourbon / Rye',
+    flavorProfiles: ['sour'],
+    complexity: 'classic',
+    glassware: 'Coupe Glass',
+    ice: 'Served Up',
+    technique: 'Shaken',
+    ingredients: [
+      { name: 'Bourbon Whiskey', amount: '1.5', unit: 'oz' },
+      { name: 'Fresh Grapefruit Juice', amount: '1', unit: 'oz' },
+      { name: 'Honey Syrup', amount: '0.5', unit: 'oz' },
+    ],
+    instructions: [
+      'Add bourbon, fresh pink grapefruit juice, and honey syrup to a shaker with ice.',
+      'Shake hard for 15 seconds.',
+      'Double strain into a chilled coupe.',
+    ],
+    garnish: 'Grapefruit Twist',
+    description: '1930s Hollywood Golden Age classic named after the famous hat-shaped diner on Wilshire Blvd.',
+  },
 
   // ==========================================
   // GIN
@@ -695,6 +845,51 @@ export const CLASSIC_COCKTAILS: ClassicCocktailSpec[] = [
     garnish: 'Fresh Raspberries or Mint Leaf',
     description: 'Pre-prohibition gentleman\'s club cocktail—silky pink foam with berry tartness.',
   },
+  {
+    id: 'bees-knees',
+    name: "Bee's Knees",
+    spiritBase: 'Gin',
+    flavorProfiles: ['sour'],
+    complexity: 'quick',
+    glassware: 'Coupe Glass',
+    ice: 'Served Up',
+    technique: 'Shaken',
+    ingredients: [
+      { name: 'London Dry Gin', amount: '2', unit: 'oz' },
+      { name: 'Fresh Lemon Juice', amount: '0.75', unit: 'oz' },
+      { name: 'Honey Syrup (3:1)', amount: '0.75', unit: 'oz' },
+    ],
+    instructions: [
+      'Combine gin, fresh lemon juice, and honey syrup in a shaker with ice.',
+      'Shake vigorously for 15 seconds.',
+      'Strain into a chilled coupe.',
+    ],
+    garnish: 'Lemon Twist',
+    description: 'Prohibition-era delight—sweet floral honey balancing botanical gin and tart lemon.',
+  },
+  {
+    id: 'southside',
+    name: 'The Southside',
+    spiritBase: 'Gin',
+    flavorProfiles: ['sour', 'herbal'],
+    complexity: 'quick',
+    glassware: 'Coupe Glass',
+    ice: 'Served Up',
+    technique: 'Shaken with Mint',
+    ingredients: [
+      { name: 'Gin', amount: '2', unit: 'oz' },
+      { name: 'Fresh Lime Juice', amount: '0.75', unit: 'oz' },
+      { name: 'Simple Syrup', amount: '0.75', unit: 'oz' },
+      { name: 'Fresh Mint Leaves', amount: '6-8', unit: 'leaves' },
+    ],
+    instructions: [
+      'Gently slap mint leaves and add to shaker with gin, lime juice, and syrup.',
+      'Add ice and shake hard for 15 seconds.',
+      'Fine double strain into a chilled coupe.',
+    ],
+    garnish: 'Single Slapped Mint Leaf Float',
+    description: 'The gin counterpart to the Mojito and Daiquiri—exceptionally crisp, minty, and clean.',
+  },
 
   // ==========================================
   // RUM
@@ -770,6 +965,51 @@ export const CLASSIC_COCKTAILS: ClassicCocktailSpec[] = [
     garnish: 'Pineapple Fronds & Maraschino Cherry',
     description: '1970s Malaysian tiki masterpiece—where dark molasses rum meets bitter Italian Campari.',
   },
+  {
+    id: 'mojito',
+    name: 'Classic Mojito',
+    spiritBase: 'Rum',
+    flavorProfiles: ['highball', 'herbal', 'sour'],
+    complexity: 'classic',
+    glassware: 'Collins Glass',
+    ice: 'Crushed Ice',
+    technique: 'Muddled & Built',
+    ingredients: [
+      { name: 'White Rum', amount: '2', unit: 'oz' },
+      { name: 'Fresh Lime Juice', amount: '0.75', unit: 'oz' },
+      { name: 'Simple Syrup', amount: '0.75', unit: 'oz' },
+      { name: 'Fresh Mint Leaves', amount: '8-10', unit: 'leaves' },
+      { name: 'Club Soda', amount: '2-3', unit: 'oz' },
+    ],
+    instructions: [
+      'Gently muddle mint leaves with lime juice and simple syrup in the base of a highball glass.',
+      'Add white rum and fill the glass with crushed ice.',
+      'Top with sparkling club soda and swizzle with a bar spoon.',
+    ],
+    garnish: 'Generous Fresh Mint Bouquet & Lime Wheel',
+    description: 'Havana\'s legendary refresher—crisp mint, zesty lime, and sparkling effervescence.',
+  },
+  {
+    id: 'dark-n-stormy',
+    name: "Dark 'n Stormy",
+    spiritBase: 'Rum',
+    flavorProfiles: ['highball', 'sour'],
+    complexity: 'quick',
+    glassware: 'Highball Glass',
+    ice: 'Cubed Ice',
+    technique: 'Built with Float',
+    ingredients: [
+      { name: 'Black Seal Dark Rum', amount: '2', unit: 'oz' },
+      { name: 'Fresh Lime Juice', amount: '0.5', unit: 'oz' },
+      { name: 'Spicy Ginger Beer', amount: '4', unit: 'oz' },
+    ],
+    instructions: [
+      'Fill a tall highball glass with ice and add lime juice and ginger beer.',
+      'Gently float dark rum over the top of the glass.',
+    ],
+    garnish: 'Lime Wedge',
+    description: 'Bermuda\'s national cocktail—fiery ginger beer under a stormy cloud of dark molasses rum.',
+  },
 
   // ==========================================
   // VODKA
@@ -819,6 +1059,29 @@ export const CLASSIC_COCKTAILS: ClassicCocktailSpec[] = [
     garnish: 'Lime Wheel & Fresh Mint Sprig',
     description: 'Crisp, spicy ginger kick with icy refreshment.',
   },
+  {
+    id: 'cosmopolitan',
+    name: 'Cosmopolitan',
+    spiritBase: 'Vodka',
+    flavorProfiles: ['sour'],
+    complexity: 'classic',
+    glassware: 'Martini Glass or Coupe',
+    ice: 'Served Up',
+    technique: 'Shaken',
+    ingredients: [
+      { name: 'Citrus Vodka', amount: '1.5', unit: 'oz' },
+      { name: 'Cointreau or Triple Sec', amount: '0.75', unit: 'oz' },
+      { name: 'Fresh Lime Juice', amount: '0.5', unit: 'oz' },
+      { name: 'Cranberry Juice', amount: '0.5', unit: 'oz' },
+    ],
+    instructions: [
+      'Combine citrus vodka, Cointreau, lime juice, and cranberry juice in a shaker with ice.',
+      'Shake vigorously for 15 seconds.',
+      'Strain into a chilled martini glass.',
+    ],
+    garnish: 'Flamed Orange Twist',
+    description: 'Toby Cecchini\'s 1988 modern icon—vibrant pink hue with tart lime and orange zest.',
+  },
 
   // ==========================================
   // BRANDY / SPRITZ
@@ -866,5 +1129,27 @@ export const CLASSIC_COCKTAILS: ClassicCocktailSpec[] = [
     ],
     garnish: 'Fresh Orange Wheel & Green Olive',
     description: 'The golden hour aperitivo—effervescent, bittersweet, and light on alcohol.',
+  },
+  {
+    id: 'americano',
+    name: 'Americano',
+    spiritBase: 'Amaro / Spritz',
+    flavorProfiles: ['highball', 'bitter'],
+    complexity: 'quick',
+    glassware: 'Highball Glass',
+    ice: 'Cubed Ice',
+    technique: 'Built in Glass',
+    ingredients: [
+      { name: 'Campari', amount: '1.5', unit: 'oz' },
+      { name: 'Sweet Vermouth', amount: '1.5', unit: 'oz' },
+      { name: 'Club Soda', amount: '3', unit: 'oz' },
+    ],
+    instructions: [
+      'Fill a highball glass with ice.',
+      'Add equal parts Campari and sweet vermouth.',
+      'Top with sparkling club soda and stir gently.',
+    ],
+    garnish: 'Orange Wheel & Lemon Twist',
+    description: '1860s Milanese classic—the ancestor of the Negroni with sparkling effervescence.',
   },
 ];

@@ -44,7 +44,7 @@ export async function POST(req: Request) {
 
     const userId = session.user.id;
     const body = await req.json();
-    const { spiritBase, flavorProfile, complexity } = body;
+    const { spiritBase, flavorProfile, complexity, limit = 6, offset = 0 } = body;
 
     // 1. Fetch user's entire inventory (both pantry & bar items)
     const userInventory = await db.pantryItem.findMany({
@@ -199,7 +199,6 @@ export async function POST(req: Request) {
     const matchesSpiritBase = (classic: ClassicCocktailSpec) => {
       if (!targetSpirit) return true;
       const base = classic.spiritBase.toLowerCase();
-      // Handle combined categories like "Bourbon / Rye", "Tequila / Mezcal", "Amaro / Spritz"
       if (base.includes(targetSpirit) || targetSpirit.includes(base)) return true;
       if (targetSpirit.includes('tequila') && base.includes('mezcal')) return true;
       if (targetSpirit.includes('whiskey') && (base.includes('bourbon') || base.includes('rye'))) return true;
@@ -216,11 +215,11 @@ export async function POST(req: Request) {
       return classic.complexity.toLowerCase() === targetComplexity;
     };
 
-    // Level 1: Exact Spirit + Exact Flavor + Exact Complexity (Top Tier Survey Alignment)
+    // Level 1: Exact Spirit + Exact Flavor + Exact Complexity
     const exactMatches: ClassicCocktailSpec[] = [];
     // Level 2: Exact Spirit + Exact Flavor
     const flavorMatches: ClassicCocktailSpec[] = [];
-    // Level 3: Exact Spirit (same spirit base)
+    // Level 3: Exact Spirit (same spirit family)
     const spiritMatches: ClassicCocktailSpec[] = [];
     // Level 4: (Only if spirit is "Any") Exact Flavor across any spirit
     const fallbackFlavorMatches: ClassicCocktailSpec[] = [];
@@ -236,7 +235,6 @@ export async function POST(req: Request) {
           flavorMatches.push(classic);
           seenIds.add(classic.id);
         } else if (targetSpirit) {
-          // Only add to spiritMatches if a spirit was explicitly requested
           spiritMatches.push(classic);
           seenIds.add(classic.id);
         }
@@ -246,7 +244,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Convert and sort each priority bucket by inventory matchScore
     const formatAndSort = (specs: ClassicCocktailSpec[]) => {
       return specs.map(formatClassic).sort((a, b) => b.matchScore - a.matchScore);
     };
@@ -265,24 +262,28 @@ export async function POST(req: Request) {
     ];
 
     // Deduplicate by ID
-    const webClassicMatches: CocktailRecommendationResult[] = [];
+    const uniqueWebMatches: CocktailRecommendationResult[] = [];
     const uniqueIds = new Set<string>();
     for (const match of combinedWebMatches) {
       if (!uniqueIds.has(match.id)) {
         uniqueIds.add(match.id);
-        webClassicMatches.push(match);
+        uniqueWebMatches.push(match);
       }
-      if (webClassicMatches.length >= 6) break;
     }
 
-    // Combine Tier 1 & Tier 2: Library matches first, followed by curated digital craft specs
+    // Paginate based on offset & limit
+    const paginatedWebMatches = uniqueWebMatches.slice(offset, offset + limit);
+    const hasMore = offset + limit < uniqueWebMatches.length;
+
     return NextResponse.json({
       success: true,
       libraryCount: libraryMatches.length,
-      webCount: webClassicMatches.length,
+      webCount: paginatedWebMatches.length,
+      totalWebAvailable: uniqueWebMatches.length,
+      hasMore,
       recommendations: {
         libraryMatches,
-        webClassicMatches,
+        webClassicMatches: paginatedWebMatches,
       },
     });
   } catch (error) {
