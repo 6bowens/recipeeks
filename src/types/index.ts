@@ -62,4 +62,5 @@ export interface MatchedRecipeResult {
   matchedIngredients: string[];
   matchedPantryMap?: Record<string, string>; // ingredientName -> pantryItemId
   isDessert?: boolean;
+  starIngredientMatch?: string;
 }

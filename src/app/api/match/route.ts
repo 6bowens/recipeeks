@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { normalizeIngredientName, isDessertRecipe } from '@/lib/utils';
+import { matchesCutConstraint, identifyCut, CUT_CATEGORIES } from '@/lib/cut-utils';
 import { MatchedRecipeResult } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const cookbookIdFilter = searchParams.get('cookbookId');
     const minMatchScore = parseInt(searchParams.get('minScore') || '0', 10);
+    const mustUseFilter = searchParams.get('mustUse')?.trim() || null;
 
     // 1. Fetch user's pantry items & staples
     const pantryItems = await db.pantryItem.findMany({
@@ -76,6 +78,7 @@ export async function GET(req: Request) {
     });
 
     const results: MatchedRecipeResult[] = [];
+    const cutCountMap = new Map<string, number>();
 
     for (const book of cookbooks) {
       for (const recipe of book.recipes) {
@@ -87,6 +90,10 @@ export async function GET(req: Request) {
         const matched: string[] = [];
         const missing: string[] = [];
         const matchedPantryMap: Record<string, string> = {};
+        let starIngredientMatch: string | undefined = undefined;
+
+        // Track cuts found in this recipe for stats
+        const cutsInRecipe = new Set<string>();
 
         for (const ing of ingredients) {
           const norm = ing.normalizedName || normalizeIngredientName(ing.name);
@@ -100,10 +107,36 @@ export async function GET(req: Request) {
           } else {
             missing.push(ing.name);
           }
+
+          // Check if this ingredient matches the mustUse target
+          if (mustUseFilter && !starIngredientMatch) {
+            if (matchesCutConstraint(ing.name, mustUseFilter) || matchesCutConstraint(recipe.title, mustUseFilter)) {
+              starIngredientMatch = ing.name;
+            }
+          }
+
+          // Track cut identification for autocomplete counts
+          const identified = identifyCut(ing.name);
+          if (identified) {
+            cutsInRecipe.add(identified.cutId);
+          }
+        }
+
+        cutsInRecipe.forEach((cutId) => {
+          cutCountMap.set(cutId, (cutCountMap.get(cutId) || 0) + 1);
+        });
+
+        // If a must-use constraint was requested and this recipe doesn't contain it, skip!
+        if (mustUseFilter && !starIngredientMatch) {
+          // Check recipe title as fallback
+          if (matchesCutConstraint(recipe.title, mustUseFilter)) {
+            starIngredientMatch = mustUseFilter;
+          } else {
+            continue;
+          }
         }
 
         const isDessert = isDessertRecipe({ title: recipe.title, category: recipe.category }, book.title);
-
         const matchScore = Math.round((matched.length / totalCount) * 100);
 
         if (matchScore >= minMatchScore) {
@@ -123,6 +156,7 @@ export async function GET(req: Request) {
             matchedIngredients: matched,
             matchedPantryMap,
             isDessert,
+            starIngredientMatch,
           });
         }
       }
@@ -139,10 +173,36 @@ export async function GET(req: Request) {
       return a.recipeTitle.localeCompare(b.recipeTitle);
     });
 
+    // 3. Extract user's stocked fridge/freezer cuts & key staples as 1-click quick chips
+    const inventoryCuts: { id: string; label: string; icon: string; recipeCount: number; originalName: string }[] = [];
+    const seenCutIds = new Set<string>();
+
+    for (const pItem of pantryItems) {
+      const cut = identifyCut(pItem.name);
+      if (cut && !seenCutIds.has(cut.cutId)) {
+        seenCutIds.add(cut.cutId);
+        const recipeCount = cutCountMap.get(cut.cutId) || 0;
+        if (recipeCount > 0) {
+          inventoryCuts.push({
+            id: cut.cutId,
+            label: cut.label,
+            icon: cut.icon,
+            recipeCount,
+            originalName: pItem.name,
+          });
+        }
+      }
+    }
+
+    // Sort inventory cuts by recipe count descending
+    inventoryCuts.sort((a, b) => b.recipeCount - a.recipeCount);
+
     return NextResponse.json({
       success: true,
       totalMatches: results.length,
       perfectMatches: results.filter((r) => r.matchScore === 100).length,
+      mustUse: mustUseFilter,
+      inventoryCuts,
       results,
     });
   } catch (error) {
