@@ -62,12 +62,6 @@ function NavbarContent() {
       label: 'Bar Cart & Bottles',
       icon: Wine,
     },
-    {
-      href: '/',
-      tabId: 'kitchen',
-      label: 'Back to Kitchen',
-      icon: ChefHat,
-    },
   ];
 
   const activeLinks = isCocktails ? cocktailNavLinks : cookingNavLinks;
