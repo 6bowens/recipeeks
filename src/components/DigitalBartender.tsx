@@ -151,13 +151,17 @@ export function DigitalBartender() {
         if (!prev) return prev;
         const existingIds = new Set(prev.webClassicMatches.map((i) => i.id));
         const filteredNew = newItems.filter((i: CocktailRecommendationResult) => !existingIds.has(i.id));
+        const itemsToAdd = filteredNew.length > 0 ? filteredNew : newItems.map((it: CocktailRecommendationResult, idx: number) => ({
+          ...it,
+          id: `${it.id}-more-${Date.now()}-${idx}`
+        }));
         return {
           ...prev,
-          webClassicMatches: [...prev.webClassicMatches, ...filteredNew],
+          webClassicMatches: [...prev.webClassicMatches, ...itemsToAdd],
         };
       });
 
-      setHasMore(!!data.hasMore);
+      setHasMore(true);
     } catch (err) {
       alert('Error loading more cocktails: ' + (err as Error).message);
     } finally {

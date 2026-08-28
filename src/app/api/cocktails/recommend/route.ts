@@ -271,16 +271,29 @@ export async function POST(req: Request) {
       }
     }
 
-    // Paginate based on offset & limit
-    const paginatedWebMatches = uniqueWebMatches.slice(offset, offset + limit);
-    const hasMore = offset + limit < uniqueWebMatches.length;
+    // Paginate based on offset & limit (infinite continuous pool with unique IDs)
+    const pool = uniqueWebMatches.length > 0 ? uniqueWebMatches : CLASSIC_COCKTAILS.map(formatClassic);
+    const paginatedWebMatches: CocktailRecommendationResult[] = [];
+
+    if (pool.length > 0) {
+      for (let i = 0; i < limit; i++) {
+        const globalIndex = offset + i;
+        const poolIndex = globalIndex % pool.length;
+        const cycle = Math.floor(globalIndex / pool.length);
+        const item = pool[poolIndex];
+        paginatedWebMatches.push({
+          ...item,
+          id: cycle === 0 ? item.id : `${item.id}-cycle-${cycle}-${i}`,
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,
       libraryCount: libraryMatches.length,
       webCount: paginatedWebMatches.length,
       totalWebAvailable: uniqueWebMatches.length,
-      hasMore,
+      hasMore: true, // Always keep reappearing indefinitely
       recommendations: {
         libraryMatches,
         webClassicMatches: paginatedWebMatches,
