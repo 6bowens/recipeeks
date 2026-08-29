@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { normalizeIngredientName } from '@/lib/utils';
-import { deduceAisleCategory, cleanRecipeText } from '@/lib/playlist-utils';
+import { deduceAisleCategory, cleanRecipeText, parseIngredientLine } from '@/lib/playlist-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,15 +20,33 @@ export async function GET(req: Request) {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Clean up any weird bullet characters on return
+    // Clean up any weird bullet characters and parse amounts if needed
     const cleanedRecipes = recipes.map((r) => ({
       ...r,
       title: cleanRecipeText(r.title),
       notes: r.notes ? cleanRecipeText(r.notes) : null,
-      ingredients: (r.ingredients || []).map((i) => ({
-        ...i,
-        name: cleanRecipeText(i.name),
-      })),
+      ingredients: (r.ingredients || []).map((i) => {
+        let name = cleanRecipeText(i.name);
+        let amount = i.amount ? cleanRecipeText(i.amount) : null;
+        let unit = i.unit ? cleanRecipeText(i.unit) : null;
+
+        // If amount was not parsed originally and name has embedded quantity/units
+        if (!amount && name) {
+          const parsed = parseIngredientLine(name);
+          if (parsed.amount) {
+            amount = parsed.amount;
+            unit = parsed.unit || null;
+            name = parsed.name;
+          }
+        }
+
+        return {
+          ...i,
+          name,
+          amount,
+          unit,
+        };
+      }),
     }));
 
     return NextResponse.json({
@@ -97,14 +115,37 @@ export async function POST(req: Request) {
         ingredients: {
           create: ingredients
             .map((ing: any) => {
-              const cleanedName = cleanRecipeText(ing.name || '');
+              const rawName = typeof ing === 'string' ? ing : ing.name || '';
+              let cleanedName = cleanRecipeText(rawName);
               if (!cleanedName) return null;
+
+              let amount = ing.amount ? cleanRecipeText(String(ing.amount)) : null;
+              let unit = ing.unit ? cleanRecipeText(String(ing.unit)) : null;
+              let aisleCategory = ing.aisleCategory || null;
+
+              // If amount/unit was not explicitly separated, parse it from rawName
+              if (!amount) {
+                const parsed = parseIngredientLine(rawName);
+                if (parsed.amount) {
+                  amount = parsed.amount;
+                  unit = parsed.unit || null;
+                  cleanedName = parsed.name;
+                }
+                if (!aisleCategory) {
+                  aisleCategory = parsed.aisleCategory;
+                }
+              }
+
+              if (!aisleCategory) {
+                aisleCategory = deduceAisleCategory(cleanedName);
+              }
+
               return {
                 name: cleanedName,
                 normalizedName: normalizeIngredientName(cleanedName),
-                amount: ing.amount ? cleanRecipeText(String(ing.amount)) : null,
-                unit: ing.unit ? cleanRecipeText(String(ing.unit)) : null,
-                aisleCategory: ing.aisleCategory || deduceAisleCategory(cleanedName),
+                amount: amount || null,
+                unit: unit || null,
+                aisleCategory,
                 optional: !!ing.optional,
               };
             })

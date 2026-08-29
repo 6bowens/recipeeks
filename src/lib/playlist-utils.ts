@@ -19,10 +19,66 @@ export function cleanRecipeText(str: string): string {
   if (!str) return '';
   return str
     .replace(/[\u00A0\u1680\u180e\u2000-\u200a\u202f\u205f\u3000\t]/g, ' ')
-    .replace(/^[•▪▫–—\*\-\+\[\s\]☑☐✓✔\.\d\)\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25A0\u25A1\u2713\u2714\u2610\u2611\u2612]+/g, '')
+    // Strip square checkbox markers like [ ], [x], [X], [✓]
+    .replace(/^\[[\sxX_✓✔]?\]\s*/g, '')
+    // Strip leading checkbox symbols and bullets:
+    // ▢ (U+25A2), ☐ (U+2610), ☑ (U+2611), ☒ (U+2612), • (U+2022), ▪ (U+25AA), ▫ (U+25AB), etc.
+    .replace(/^[▢☐☑☒✓✔•▪▫–—\*\-\+•◦●■□◆◇\u25A0-\u25AF\u25FB-\u25FE\u2B1A\u2B1B\u25C6\u25C7\u2022\u2023\u25E6\u2043\u2219\u2713\u2714\u2610\u2611\u2612\s]+/g, '')
+    // Strip numbered list markers like "1. ", "1) ", "1- "
+    .replace(/^\d+[\.\)\-]\s+/g, '')
+    // Strip trailing asterisks / footnotes e.g. "baking soda*" -> "baking soda"
+    .replace(/[\*\s]+$/g, '')
+    // Remove zero-width characters
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Parses raw ingredient string like "▢1 3/4 cups milk" into
+ * amount ("1 3/4"), unit ("cups"), and name ("milk").
+ */
+export function parseIngredientLine(rawStr: string): {
+  amount: string;
+  unit: string;
+  name: string;
+  aisleCategory: AisleCategory;
+} {
+  const cleaned = cleanRecipeText(rawStr);
+  if (!cleaned) {
+    return { amount: '', unit: '', name: '', aisleCategory: 'pantry' };
+  }
+
+  // Match fraction, decimal, or integer quantity at the start
+  const qtyRegex = /^((?:\d+\s+)?\d+\/\d+|\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?)\s*/i;
+  let amount = '';
+  let unit = '';
+  let name = cleaned;
+
+  const qtyMatch = cleaned.match(qtyRegex);
+  if (qtyMatch) {
+    amount = qtyMatch[1].trim();
+    name = cleaned.slice(qtyMatch[0].length).trim();
+  }
+
+  // Match common culinary units
+  const unitRegex =
+    /^(tablespoons?|tbsp|tbs|teaspoons?|tsp|cups?|c|pounds?|lbs?|lb|ounces?|oz|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|pinches|pinch|dashes|dash|cloves?|heads?|cans?|bottles?|jars?|packages?|packets?|bunches?|stalks?|slices?|pieces?|sprigs?|large|medium|small)\b\s*(?:of\s+)?/i;
+
+  const unitMatch = name.match(unitRegex);
+  if (unitMatch) {
+    unit = unitMatch[1].trim();
+    name = name.slice(unitMatch[0].length).trim();
+  }
+
+  name = cleanRecipeText(name);
+
+  return {
+    amount,
+    unit,
+    name: name || cleaned,
+    aisleCategory: deduceAisleCategory(name || cleaned),
+  };
 }
 
 export const FREQUENCY_CONFIG: Record<
