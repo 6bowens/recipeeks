@@ -11,6 +11,20 @@ export const AISLE_LABELS: Record<AisleCategory, { label: string; icon: string }
   other: { label: 'Other Groceries', icon: '🛒' },
 };
 
+/**
+ * Strips weird bullet characters, Google Notes/Keep checklist glyphs,
+ * non-breaking spaces, and OCR artifacts from recipe titles, instructions, and ingredients.
+ */
+export function cleanRecipeText(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/[\u00A0\u1680\u180e\u2000-\u200a\u202f\u205f\u3000\t]/g, ' ')
+    .replace(/^[•▪▫–—\*\-\+\[\s\]☑☐✓✔\.\d\)\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25A0\u25A1\u2713\u2714\u2610\u2611\u2612]+/g, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export const FREQUENCY_CONFIG: Record<
   string,
   { label: string; shortLabel: string; weight: number; description: string }

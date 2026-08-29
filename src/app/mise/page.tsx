@@ -2,30 +2,45 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import {
+  Calendar,
+  ShoppingCart,
+  BookMarked,
+  Sparkles,
+  RefreshCw,
+  ChefHat,
+  History,
+} from 'lucide-react';
 import { MiseDinnerPlaylist } from '@/components/MiseDinnerPlaylist';
 import { MiseGroceryDelta } from '@/components/MiseGroceryDelta';
 import { MiseRecipeVault } from '@/components/MiseRecipeVault';
-import { Calendar, ShoppingCart, BookMarked, Sparkles } from 'lucide-react';
+import { MiseMealHistory } from '@/components/MiseMealHistory';
 
 function MiseContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const currentTab = (searchParams.get('tab') as 'playlist' | 'delta' | 'vault') || 'playlist';
+  const activeTab = searchParams.get('tab') || 'playlist';
 
-  const [playlistData, setPlaylistData] = useState<any | null>(null);
-  const [groceryDeltaData, setGroceryDeltaData] = useState<any | null>(null);
-  const [availableRecipesCount, setAvailableRecipesCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [playlistData, setPlaylistData] = useState<any>(null);
+  const [recipes, setRecipes] = useState<any[]>([]);
 
-  const fetchPlaylistAndDelta = async () => {
+  const fetchAllData = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/mise/playlist');
-      if (res.ok) {
-        const data = await res.json();
-        setPlaylistData(data.playlist || null);
-        setGroceryDeltaData(data.groceryDelta || null);
-        setAvailableRecipesCount(data.availableRecipesCount || 0);
+      const [playlistRes, recipesRes] = await Promise.all([
+        fetch('/api/mise/playlist'),
+        fetch('/api/mise/recipes'),
+      ]);
+
+      if (playlistRes.ok) {
+        const pData = await playlistRes.json();
+        setPlaylistData(pData);
+      }
+
+      if (recipesRes.ok) {
+        const rData = await recipesRes.json();
+        setRecipes(rData.recipes || []);
       }
     } catch (err) {
       console.error('Error loading Mise data:', err);
@@ -35,82 +50,104 @@ function MiseContent() {
   };
 
   useEffect(() => {
-    fetchPlaylistAndDelta();
+    fetchAllData();
   }, []);
 
-  const setTab = (tab: 'playlist' | 'delta' | 'vault') => {
+  const handleTabChange = (tab: string) => {
     router.push(`/mise?tab=${tab}`);
   };
 
   return (
-    <div className="space-y-6 pb-20 selection:bg-purple-500/30 selection:text-purple-200">
-      {/* Mobile-Friendly Sub-Navigation */}
-      <div className="flex items-center justify-between border-b border-purple-900/30 pb-3">
-        <div className="flex items-center gap-1.5 sm:gap-2">
+    <div className="min-h-[calc(100vh-4rem)] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 text-white">
+      {/* Mise Tab Navigation Bar */}
+      <div className="flex items-center justify-between gap-4 border-b border-purple-900/40 pb-4 flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-[#120d1e] p-1.5 rounded-2xl border border-purple-900/40 shadow-xl overflow-x-auto max-w-full">
           <button
-            onClick={() => setTab('playlist')}
-            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              currentTab === 'playlist'
-                ? 'bg-purple-600 text-white shadow-md'
+            onClick={() => handleTabChange('playlist')}
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'playlist'
+                ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-lg'
                 : 'text-purple-300/70 hover:text-white hover:bg-white/5'
             }`}
           >
-            <Calendar className="w-3.5 h-3.5" />
+            <Calendar className="w-4 h-4" />
             <span>Dinner Playlist</span>
           </button>
 
           <button
-            onClick={() => setTab('delta')}
-            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              currentTab === 'delta'
-                ? 'bg-purple-600 text-white shadow-md'
+            onClick={() => handleTabChange('delta')}
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'delta'
+                ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-lg'
                 : 'text-purple-300/70 hover:text-white hover:bg-white/5'
             }`}
           >
-            <ShoppingCart className="w-3.5 h-3.5" />
+            <ShoppingCart className="w-4 h-4" />
             <span>Grocery Delta</span>
-            {groceryDeltaData?.totalMissingCount > 0 && (
-              <span className="bg-purple-950 border border-purple-400/50 text-purple-200 text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full">
-                {groceryDeltaData.totalMissingCount}
+            {playlistData?.groceryDelta?.totalMissingCount > 0 && (
+              <span className="bg-purple-950 text-purple-200 border border-purple-400/50 text-[10px] px-1.5 py-0.2 rounded-full font-mono">
+                {playlistData.groceryDelta.totalMissingCount}
               </span>
             )}
           </button>
 
           <button
-            onClick={() => setTab('vault')}
-            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              currentTab === 'vault'
-                ? 'bg-purple-600 text-white shadow-md'
+            onClick={() => handleTabChange('vault')}
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'vault'
+                ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-lg'
                 : 'text-purple-300/70 hover:text-white hover:bg-white/5'
             }`}
           >
-            <BookMarked className="w-3.5 h-3.5" />
+            <BookMarked className="w-4 h-4" />
             <span>Recipe Vault</span>
+            <span className="bg-white/10 text-purple-200 text-[10px] px-1.5 py-0.2 rounded-full font-mono">
+              {recipes.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('history')}
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'history'
+                ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-lg'
+                : 'text-purple-300/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <History className="w-4 h-4" />
+            <span>Meal History</span>
           </button>
         </div>
       </div>
 
-      {/* Main Content Areas */}
-      {currentTab === 'playlist' && (
+      {/* Main Tab Content */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-24 space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center animate-pulse">
+            <Sparkles className="w-6 h-6 text-purple-400 animate-spin" />
+          </div>
+          <p className="text-xs font-mono text-purple-300/60 uppercase tracking-wider">
+            Loading Mise...
+          </p>
+        </div>
+      ) : activeTab === 'playlist' ? (
         <MiseDinnerPlaylist
-          playlist={playlistData}
-          availableRecipesCount={availableRecipesCount}
-          onRefresh={fetchPlaylistAndDelta}
-          onGoToDelta={() => setTab('delta')}
-          onGoToVault={() => setTab('vault')}
+          playlist={playlistData?.playlist || null}
+          availableRecipesCount={playlistData?.availableRecipesCount || recipes.length}
+          onRefresh={fetchAllData}
+          onGoToDelta={() => handleTabChange('delta')}
+          onGoToVault={() => handleTabChange('vault')}
         />
-      )}
-
-      {currentTab === 'delta' && (
+      ) : activeTab === 'delta' ? (
         <MiseGroceryDelta
-          groceryDelta={groceryDeltaData}
-          onRefresh={fetchPlaylistAndDelta}
-          onGoToPlaylist={() => setTab('playlist')}
+          groceryDelta={playlistData?.groceryDelta || null}
+          onRefresh={fetchAllData}
+          onGoToPlaylist={() => handleTabChange('playlist')}
         />
-      )}
-
-      {currentTab === 'vault' && (
-        <MiseRecipeVault onRefresh={fetchPlaylistAndDelta} />
+      ) : activeTab === 'history' ? (
+        <MiseMealHistory />
+      ) : (
+        <MiseRecipeVault recipes={recipes} onRefresh={fetchAllData} />
       )}
     </div>
   );
@@ -118,7 +155,13 @@ function MiseContent() {
 
 export default function MisePage() {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-xs text-purple-300/60">Loading Mise...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center text-purple-400">
+          <Sparkles className="w-6 h-6 animate-spin" />
+        </div>
+      }
+    >
       <MiseContent />
     </Suspense>
   );

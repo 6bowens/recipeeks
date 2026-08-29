@@ -23,11 +23,12 @@ model User {
   aiLogs        AiUsageLog[]
   customRecipes CustomRecipe[]
   mealPlaylists MealPlaylist[]
+  mealHistory   MealHistory[]
 }
 
 model AiUsageLog {
   id          String   @id @default(cuid())
-  actionType  String   // bookshelf_scan, recipe_index, index_ocr, fridge_scan, cover_gen, url_parse
+  actionType  String   // bookshelf_scan, recipe_index, index_ocr, fridge_scan, cover_gen, url_parse, notes_parse
   costUsd     Float    @default(0.0)
   promptChars Int      @default(0)
   userId      String
@@ -126,7 +127,7 @@ model ScanSession {
 model CustomRecipe {
   id                String                   @id @default(cuid())
   title             String
-  sourceType        String                   @default("manual") // "manual", "url", "cookbook"
+  sourceType        String                   @default("manual") // "manual", "url", "cookbook", "google_notes"
   sourceUrl         String?
   cookbookTitle     String?
   pageNumber        Int?
@@ -172,4 +173,20 @@ model MealPlaylist {
   updatedAt    DateTime  @updatedAt
 
   @@index([userId])
+}
+
+model MealHistory {
+  id          String   @id @default(cuid())
+  recipeTitle String
+  recipeId    String?
+  cookedAt    DateTime @default(now())
+  sourceType  String?  @default("custom") // "custom", "cookbook", "manual"
+  notes       String?
+  rating      Int?     @default(5)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([cookedAt])
 }

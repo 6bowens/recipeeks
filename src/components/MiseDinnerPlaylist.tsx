@@ -12,13 +12,15 @@ import {
   ChevronRight,
   ExternalLink,
   BookOpen,
-  ListOrdered,
   Plus,
   ArrowRight,
   CheckCircle2,
   Calendar,
+  Check,
+  Eye,
 } from 'lucide-react';
 import { FREQUENCY_CONFIG } from '@/lib/playlist-utils';
+import { MiseRecipeDetailModal } from '@/components/MiseRecipeDetailModal';
 
 interface MiseDinnerPlaylistProps {
   playlist: {
@@ -48,13 +50,15 @@ export function MiseDinnerPlaylist({
   const [swappingDay, setSwappingDay] = useState<number | null>(null);
   const [daysCount, setDaysCount] = useState<number>(playlist?.daysCount || 3);
   const [selectedRecipeDetail, setSelectedRecipeDetail] = useState<any | null>(null);
+  const [loggingCookedDay, setLoggingCookedDay] = useState<number | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const handleGenerate = async (newDays?: number) => {
     try {
       setGenerating(true);
       const targetDays = newDays || daysCount;
       const pinned = (playlist?.slots || [])
-        .filter((s) => s.locked)
+        .filter((s) => s.locked && s.recipe?.frequency !== 'paused')
         .map((s) => ({ day: s.day, recipeId: s.recipe.id }));
 
       const res = await fetch('/api/mise/playlist', {
@@ -116,6 +120,30 @@ export function MiseDinnerPlaylist({
     }
   };
 
+  const handleMarkCooked = async (day: number, recipe: any) => {
+    try {
+      setLoggingCookedDay(day);
+      const res = await fetch('/api/mise/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipeTitle: recipe.title,
+          recipeId: recipe.id,
+          sourceType: recipe.sourceType,
+          cookedAt: new Date().toISOString(),
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to log meal');
+      setToastMessage(`✨ Logged "${recipe.title}" as cooked tonight!`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setLoggingCookedDay(null);
+    }
+  };
+
   if (!playlist || playlist.slots.length === 0) {
     return (
       <div className="bg-[#140f20] border border-purple-900/30 rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto space-y-5 shadow-2xl">
@@ -127,7 +155,7 @@ export function MiseDinnerPlaylist({
           <p className="text-xs sm:text-sm text-purple-200/70 mt-1.5 leading-relaxed">
             {availableRecipesCount === 0
               ? 'Add a few favorite recipes to your vault (or import from your Recipeeks cookbooks) to generate a customized 3 to 4 day rotation.'
-              : `You have ${availableRecipesCount} recipe(s) ready in your vault. Generate your customized dinner rotation.`}
+              : `You have ${availableRecipesCount} active recipe(s) ready in your vault. Generate your customized dinner rotation.`}
           </p>
         </div>
 
@@ -153,11 +181,20 @@ export function MiseDinnerPlaylist({
     );
   }
 
-  const currentSlots = playlist.slots;
+  // Filter out any slots where recipe is paused
+  const currentSlots = playlist.slots.filter((s) => s.recipe && s.recipe.frequency !== 'paused');
   const activeSlot = currentSlots.find((s) => s.day === selectedDayTab) || currentSlots[0];
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-purple-950 border border-purple-500 text-purple-200 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 font-semibold text-xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Top Header & Duration Controls */}
       <div className="bg-gradient-to-r from-[#120d1f] via-[#1a122c] to-[#120d1f] rounded-3xl p-5 sm:p-7 border border-purple-900/30 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -166,7 +203,7 @@ export function MiseDinnerPlaylist({
               Active Rotation
             </span>
             <span className="text-xs text-purple-300/70 font-mono">
-              {availableRecipesCount} recipes in rotation
+              {availableRecipesCount} active recipes in rotation
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-serif font-bold text-white leading-tight">
@@ -251,7 +288,10 @@ export function MiseDinnerPlaylist({
       {activeSlot && (
         <div className="bg-[#140f20] rounded-3xl border border-purple-900/30 p-6 sm:p-8 shadow-2xl space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/5">
-            <div className="space-y-1">
+            <div
+              onClick={() => setSelectedRecipeDetail(activeSlot.recipe)}
+              className="space-y-1 cursor-pointer group"
+            >
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded font-mono">
                   Day {activeSlot.day} Dinner
@@ -265,13 +305,23 @@ export function MiseDinnerPlaylist({
                   </span>
                 )}
               </div>
-              <h3 className="text-2xl font-serif font-bold text-white leading-tight">
-                {activeSlot.recipe.title}
+              <h3 className="text-2xl font-serif font-bold text-white leading-tight group-hover:text-purple-200 transition-colors flex items-center gap-2">
+                <span>{activeSlot.recipe.title}</span>
+                <Eye className="w-4 h-4 opacity-0 group-hover:opacity-100 text-purple-400 transition-opacity" />
               </h3>
             </div>
 
-            {/* Quick Slot Actions (Swap / Lock) */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Quick Slot Actions (Cooked / Swap / Lock) */}
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <button
+                onClick={() => handleMarkCooked(activeSlot.day, activeSlot.recipe)}
+                disabled={loggingCookedDay === activeSlot.day}
+                className="px-3.5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95"
+              >
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>{loggingCookedDay === activeSlot.day ? 'Logging...' : 'Cooked Tonight'}</span>
+              </button>
+
               <button
                 onClick={() => handleToggleLock(activeSlot.day)}
                 title={activeSlot.locked ? 'Unlock meal for shuffle' : 'Lock meal to preserve during shuffle'}
@@ -282,16 +332,16 @@ export function MiseDinnerPlaylist({
                 }`}
               >
                 {activeSlot.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                <span>{activeSlot.locked ? 'Pinned' : 'Pin Meal'}</span>
+                <span>{activeSlot.locked ? 'Pinned' : 'Pin'}</span>
               </button>
 
               <button
                 onClick={() => handleSwapSlot(activeSlot.day)}
                 disabled={swappingDay === activeSlot.day}
-                className="px-3.5 py-2.5 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                className="px-3 py-2.5 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
               >
                 <RotateCcw className={`w-3.5 h-3.5 ${swappingDay === activeSlot.day ? 'animate-spin' : ''}`} />
-                <span>Swap Dish</span>
+                <span>Swap</span>
               </button>
             </div>
           </div>
@@ -323,9 +373,19 @@ export function MiseDinnerPlaylist({
 
           {/* Ingredients Grid */}
           <div className="space-y-2">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-purple-400 font-mono">
-              Key Ingredients ({activeSlot.recipe.ingredients?.length || 0})
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-purple-400 font-mono">
+                Key Ingredients ({activeSlot.recipe.ingredients?.length || 0})
+              </span>
+              <button
+                onClick={() => setSelectedRecipeDetail(activeSlot.recipe)}
+                className="text-xs font-semibold text-purple-300 hover:text-white flex items-center gap-1 cursor-pointer"
+              >
+                <span>View Recipe & Method</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {activeSlot.recipe.ingredients?.map((ing: any, i: number) => (
                 <div
@@ -361,6 +421,15 @@ export function MiseDinnerPlaylist({
           </div>
         </button>
       </div>
+
+      {/* Full Recipe Detail Modal */}
+      {selectedRecipeDetail && (
+        <MiseRecipeDetailModal
+          recipe={selectedRecipeDetail}
+          onClose={() => setSelectedRecipeDetail(null)}
+          onMarkCooked={(r) => handleMarkCooked(activeSlot.day, r)}
+        />
+      )}
     </div>
   );
 }

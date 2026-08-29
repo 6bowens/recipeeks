@@ -22,6 +22,7 @@ import {
   ShoppingCart,
   BookMarked,
   UtensilsCrossed,
+  History,
 } from 'lucide-react';
 
 function NavbarContent() {
@@ -85,6 +86,12 @@ function NavbarContent() {
       tabId: 'vault',
       label: 'Recipe Vault',
       icon: BookMarked,
+    },
+    {
+      href: '/mise?tab=history',
+      tabId: 'history',
+      label: 'Meal History',
+      icon: History,
     },
   ];
 

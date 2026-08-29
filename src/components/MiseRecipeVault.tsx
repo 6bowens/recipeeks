@@ -1,399 +1,321 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
+  BookMarked,
   Plus,
   Link as LinkIcon,
   BookOpen,
-  Edit3,
   Trash2,
   Clock,
   Users,
   ExternalLink,
-  RotateCcw,
   Sparkles,
   Check,
-  CheckCircle2,
+  Search,
+  ChevronDown,
   X,
-  Layers,
-  ChevronRight,
-  Filter,
+  FileText,
+  Eye,
 } from 'lucide-react';
-import { FREQUENCY_CONFIG, deduceAisleCategory } from '@/lib/playlist-utils';
+import { FREQUENCY_CONFIG } from '@/lib/playlist-utils';
+import { MiseRecipeDetailModal } from '@/components/MiseRecipeDetailModal';
+import { MiseGoogleNotesModal } from '@/components/MiseGoogleNotesModal';
 
 interface MiseRecipeVaultProps {
+  recipes: any[];
   onRefresh: () => void;
 }
 
-export function MiseRecipeVault({ onRefresh }: MiseRecipeVaultProps) {
-  const [recipes, setRecipes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFrequencyFilter, setSelectedFrequencyFilter] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activeAddTab, setActiveAddTab] = useState<'url' | 'manual' | 'cookbook'>('url');
-  const [filterFrequency, setFilterFrequency] = useState<string>('all');
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [selectedRecipeForDetail, setSelectedRecipeForDetail] = useState<any | null>(null);
 
-  // URL Import State
+  // Manual Add Form State
+  const [addMode, setAddMode] = useState<'url' | 'manual'>('url');
   const [urlInput, setUrlInput] = useState('');
-  const [urlFrequency, setUrlFrequency] = useState('1_week');
-  const [parsingUrl, setParsingUrl] = useState(false);
-
-  // Manual Input State
+  const [urlParsing, setUrlParsing] = useState(false);
   const [manualTitle, setManualTitle] = useState('');
-  const [manualFrequency, setManualFrequency] = useState('1_week');
-  const [manualServings, setManualServings] = useState('2-4');
   const [manualCookTime, setManualCookTime] = useState('30 mins');
+  const [manualServings, setManualServings] = useState('2-4');
+  const [manualFrequency, setManualFrequency] = useState('1_week');
   const [manualIngredientsText, setManualIngredientsText] = useState('');
+  const [manualInstructionsText, setManualInstructionsText] = useState('');
   const [manualNotes, setManualNotes] = useState('');
-  const [savingManual, setSavingManual] = useState(false);
+  const [savingRecipe, setSavingRecipe] = useState(false);
 
-  // Cookbook Import State
-  const [cookbooks, setCookbooks] = useState<any[]>([]);
-  const [selectedCookbookId, setSelectedCookbookId] = useState<string>('');
-  const [cookbookRecipes, setCookbookRecipes] = useState<any[]>([]);
-  const [importingCookbookRecipe, setImportingCookbookRecipe] = useState<string | null>(null);
-
-  const fetchVault = async () => {
+  const handleUpdateFrequency = async (recipeId: string, frequency: string) => {
     try {
-      setLoading(true);
-      const res = await fetch('/api/mise/recipes');
-      if (res.ok) {
-        const data = await res.json();
-        setRecipes(data.recipes || []);
-      }
-    } catch (err) {
-      console.error('Fetch vault error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCookbooks = async () => {
-    try {
-      const res = await fetch('/api/cookbooks');
-      if (res.ok) {
-        const data = await res.json();
-        setCookbooks(data.cookbooks || []);
-        if (data.cookbooks?.length > 0) {
-          setSelectedCookbookId(data.cookbooks[0].id);
-          fetchCookbookRecipes(data.cookbooks[0].id);
-        }
-      }
-    } catch (err) {
-      console.error('Fetch cookbooks error:', err);
-    }
-  };
-
-  const fetchCookbookRecipes = async (cbId: string) => {
-    try {
-      const res = await fetch(`/api/cookbooks/${cbId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setCookbookRecipes(data.cookbook?.recipes || []);
-      }
-    } catch (err) {
-      console.error('Fetch cb recipes error:', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchVault();
-  }, []);
-
-  const handleUpdateFrequency = async (recipeId: string, newFrequency: string) => {
-    try {
-      // Optimistic update
-      setRecipes((prev) =>
-        prev.map((r) => (r.id === recipeId ? { ...r, frequency: newFrequency } : r))
-      );
-
-      await fetch('/api/mise/recipes', {
+      const res = await fetch('/api/mise/recipes', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: recipeId, frequency: newFrequency }),
+        body: JSON.stringify({ id: recipeId, frequency }),
       });
+
+      if (!res.ok) throw new Error('Failed to update frequency');
       onRefresh();
     } catch (err) {
-      alert('Failed to update frequency');
-      fetchVault();
+      alert((err as Error).message);
     }
   };
 
-  const handleDeleteRecipe = async (id: string, title: string) => {
-    if (!confirm(`Remove "${title}" from your Mise vault?`)) return;
+  const handleDeleteRecipe = async (recipeId: string, title: string) => {
+    if (!confirm(`Are you sure you want to remove "${title}" from your Mise vault?`)) {
+      return;
+    }
+
     try {
-      setRecipes((prev) => prev.filter((r) => r.id !== id));
-      await fetch(`/api/mise/recipes?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/mise/recipes?id=${recipeId}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) throw new Error('Failed to delete recipe');
       onRefresh();
     } catch (err) {
-      alert('Failed to delete recipe');
-      fetchVault();
+      alert((err as Error).message);
     }
   };
 
-  const handleImportUrl = async (e: React.FormEvent) => {
+  const handleParseUrl = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!urlInput.trim()) return;
 
     try {
-      setParsingUrl(true);
-      const parseRes = await fetch('/api/mise/parse-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: urlInput.trim() }),
-      });
-
-      if (!parseRes.ok) throw new Error('Failed to parse URL');
-      const parsed = await parseRes.json();
-      const rec = parsed.recipe;
-
-      // Save to database
-      const saveRes = await fetch('/api/mise/recipes', {
+      setUrlParsing(true);
+      const res = await fetch('/api/mise/parse-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: rec.title,
-          sourceType: 'url',
-          sourceUrl: rec.sourceUrl,
-          servings: rec.servings,
-          prepTime: rec.prepTime,
-          cookTime: rec.cookTime,
-          frequency: urlFrequency,
-          instructions: rec.instructions,
-          ingredients: rec.ingredients,
+          url: urlInput.trim(),
+          frequency: manualFrequency,
         }),
       });
 
-      if (!saveRes.ok) throw new Error('Failed to save recipe');
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to import recipe from URL');
+      }
+
       setUrlInput('');
       setShowAddModal(false);
-      fetchVault();
       onRefresh();
     } catch (err) {
-      alert('Error importing URL: ' + (err as Error).message);
+      alert((err as Error).message);
     } finally {
-      setParsingUrl(false);
+      setUrlParsing(false);
     }
   };
 
-  const handleSaveManual = async (e: React.FormEvent) => {
+  const handleManualSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualTitle.trim()) return;
 
     try {
-      setSavingManual(true);
-      const lines = manualIngredientsText
+      setSavingRecipe(true);
+      const ingredients = manualIngredientsText
         .split('\n')
         .map((l) => l.trim())
-        .filter(Boolean);
-
-      const ingredients = lines.map((line) => {
-        return {
-          name: line,
-          amount: '',
-          unit: '',
-          aisleCategory: deduceAisleCategory(line),
-        };
-      });
+        .filter(Boolean)
+        .map((line) => ({ name: line }));
 
       const res = await fetch('/api/mise/recipes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: manualTitle.trim(),
-          sourceType: 'manual',
-          servings: manualServings,
-          cookTime: manualCookTime,
+          cookTime: manualCookTime.trim() || undefined,
+          servings: manualServings.trim() || undefined,
           frequency: manualFrequency,
-          notes: manualNotes,
           ingredients,
+          instructions: manualInstructionsText.trim() || undefined,
+          notes: manualNotes.trim() || undefined,
+          sourceType: 'manual',
         }),
       });
 
-      if (!res.ok) throw new Error('Failed to save recipe');
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to save recipe');
+      }
+
       setManualTitle('');
       setManualIngredientsText('');
+      setManualInstructionsText('');
       setManualNotes('');
       setShowAddModal(false);
-      fetchVault();
       onRefresh();
     } catch (err) {
-      alert('Error saving recipe: ' + (err as Error).message);
+      alert((err as Error).message);
     } finally {
-      setSavingManual(false);
-    }
-  };
-
-  const handleImportCookbookRecipe = async (recipeId: string) => {
-    try {
-      setImportingCookbookRecipe(recipeId);
-      const res = await fetch('/api/mise/import-cookbook-recipe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipeId, frequency: '1_week' }),
-      });
-
-      if (!res.ok) throw new Error('Failed to import recipe');
-      fetchVault();
-      onRefresh();
-    } catch (err) {
-      alert('Error importing cookbook recipe: ' + (err as Error).message);
-    } finally {
-      setImportingCookbookRecipe(null);
+      setSavingRecipe(false);
     }
   };
 
   const filteredRecipes = recipes.filter((r) => {
-    if (filterFrequency === 'all') return true;
-    return r.frequency === filterFrequency;
+    const matchesSearch =
+      r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.ingredients || []).some((i: any) =>
+        i.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+    const matchesFreq =
+      selectedFrequencyFilter === 'all' || r.frequency === selectedFrequencyFilter;
+
+    return matchesSearch && matchesFreq;
   });
 
   return (
     <div className="space-y-6">
-      {/* Vault Header & Add Button */}
-      <div className="bg-gradient-to-r from-[#120d1f] via-[#1a122c] to-[#120d1f] rounded-3xl p-5 sm:p-7 border border-purple-900/30 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-[#120d1f] via-[#1a122c] to-[#120d1f] rounded-3xl p-5 sm:p-7 border border-purple-900/30 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
             <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
               Recipe Vault
             </span>
             <span className="text-xs text-purple-300/70 font-mono">
-              {recipes.length} total saved recipe{recipes.length === 1 ? '' : 's'}
+              {recipes.length} total saved recipes
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-serif font-bold text-white leading-tight">
-            Dinner Recipe Repository
+            Recipe Repository & Cadence
           </h2>
           <p className="text-xs text-purple-200/60 mt-0.5">
-            Set your target rotation frequency for each dish (or 0x to pause).
+            Set how frequently you want each dish to appear in your dinner rotation.
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setShowAddModal(true);
-            fetchCookbooks();
-          }}
-          className="px-5 py-3 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-600 hover:from-purple-500 hover:to-purple-400 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95 shrink-0"
-        >
-          <Plus className="w-4 h-4 stroke-[3]" />
-          <span>Add Recipe</span>
-        </button>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        <button
-          onClick={() => setFilterFrequency('all')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            filterFrequency === 'all'
-              ? 'bg-purple-600 text-white shadow-sm'
-              : 'bg-[#140f20] text-purple-300/60 hover:text-white border border-white/5'
-          }`}
-        >
-          All ({recipes.length})
-        </button>
-        {Object.entries(FREQUENCY_CONFIG).map(([k, meta]) => {
-          const count = recipes.filter((r) => r.frequency === k).length;
-          return (
-            <button
-              key={k}
-              onClick={() => setFilterFrequency(k)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
-                filterFrequency === k
-                  ? 'bg-purple-600 text-white shadow-sm'
-                  : 'bg-[#140f20] text-purple-300/60 hover:text-white border border-white/5'
-              }`}
-            >
-              {meta.shortLabel} ({count})
-            </button>
-          );
-        })}
-      </div>
-
-      {/* RECIPES LIST */}
-      {loading ? (
-        <div className="py-12 text-center text-xs text-purple-300/60">Loading Mise vault...</div>
-      ) : filteredRecipes.length === 0 ? (
-        <div className="bg-[#140f20] border border-purple-900/30 rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-xl">
-          <p className="text-sm font-semibold text-white">No recipes found in this view.</p>
-          <p className="text-xs text-purple-200/70 max-w-sm mx-auto">
-            Add recipes manually, paste web links, or 1-click import from your physical cookbooks.
-          </p>
+        {/* Action Buttons: Google Notes & Add Recipe */}
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-between sm:justify-end">
           <button
-            onClick={() => {
-              setShowAddModal(true);
-              fetchCookbooks();
-            }}
-            className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-md inline-flex items-center gap-2 cursor-pointer transition-all"
+            onClick={() => setShowNotesModal(true)}
+            className="px-4 py-3 bg-gradient-to-r from-amber-600/30 to-amber-500/30 hover:from-amber-600/50 hover:to-amber-500/50 border border-amber-500/40 text-amber-200 hover:text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+            title="Scan one or multiple recipes copied from Google Notes / Google Keep"
+          >
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <span>Scan Google Notes</span>
+          </button>
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-5 py-3 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-600 hover:from-purple-500 hover:to-purple-400 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95 shrink-0"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Add First Recipe</span>
+            <span>Add Recipe</span>
           </button>
         </div>
+      </div>
+
+      {/* Filter & Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="relative w-full sm:w-72">
+          <Search className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400/50" />
+          <input
+            type="text"
+            placeholder="Search vault recipes or ingredients..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-[#140f20] border border-purple-900/30 text-white rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-purple-500 placeholder:text-purple-300/40"
+          />
+        </div>
+
+        {/* Frequency Filter Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 scrollbar-none">
+          <button
+            onClick={() => setSelectedFrequencyFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 cursor-pointer transition-all ${
+              selectedFrequencyFilter === 'all'
+                ? 'bg-purple-600 text-white font-bold'
+                : 'bg-[#140f20] text-purple-200/60 hover:text-white border border-white/5'
+            }`}
+          >
+            All ({recipes.length})
+          </button>
+          {Object.entries(FREQUENCY_CONFIG).map(([k, meta]) => {
+            const count = recipes.filter((r) => r.frequency === k).length;
+            return (
+              <button
+                key={k}
+                onClick={() => setSelectedFrequencyFilter(k)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 cursor-pointer transition-all ${
+                  selectedFrequencyFilter === k
+                    ? 'bg-purple-600 text-white font-bold'
+                    : 'bg-[#140f20] text-purple-200/60 hover:text-white border border-white/5'
+                }`}
+              >
+                {meta.shortLabel} ({count})
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Recipes Grid */}
+      {filteredRecipes.length === 0 ? (
+        <div className="bg-[#140f20] border border-purple-900/30 rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-xl">
+          <BookMarked className="w-12 h-12 mx-auto text-purple-500/40" />
+          <h3 className="text-lg font-bold text-white">No Recipes Found</h3>
+          <p className="text-xs text-purple-200/70 max-w-sm mx-auto">
+            {searchQuery
+              ? `No recipes matching "${searchQuery}". Try a different term or clear the search.`
+              : 'Add your favorite dishes via URL, Google Notes, or from your Recipeeks cookbooks.'}
+          </p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredRecipes.map((r) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredRecipes.map((recipe) => (
             <div
-              key={r.id}
-              className="bg-[#140f20] rounded-2xl border border-purple-900/30 p-5 shadow-xl flex flex-col justify-between hover:border-purple-500/40 transition-colors"
+              key={recipe.id}
+              onClick={() => setSelectedRecipeForDetail(recipe)}
+              className="bg-[#140f20] rounded-3xl border border-purple-900/30 p-5 shadow-xl space-y-4 hover:border-purple-500/50 transition-all flex flex-col justify-between cursor-pointer group"
             >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5">
-                    {r.sourceType === 'cookbook' ? (
-                      <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
-                        <BookOpen className="w-3 h-3" /> {r.cookbookTitle || 'Cookbook'}
-                      </span>
-                    ) : r.sourceType === 'url' ? (
-                      <a
-                        href={r.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1 hover:underline"
-                      >
-                        <LinkIcon className="w-3 h-3" /> Web Link
-                      </a>
-                    ) : (
-                      <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
-                        Manual Entry
-                      </span>
-                    )}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  {recipe.sourceType === 'cookbook' ? (
+                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
+                      <BookOpen className="w-2.5 h-2.5" /> {recipe.cookbookTitle || 'Cookbook'}
+                    </span>
+                  ) : recipe.sourceType === 'google_notes' ? (
+                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
+                      📝 Google Notes
+                    </span>
+                  ) : recipe.sourceType === 'url' ? (
+                    <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
+                      <span>Web</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </span>
+                  ) : (
+                    <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
+                      Manual
+                    </span>
+                  )}
 
-                    {r.cookTime && (
-                      <span className="text-[10px] text-purple-300/60 font-mono">
-                        {r.cookTime}
-                      </span>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => handleDeleteRecipe(r.id, r.title)}
-                    className="text-purple-400/40 hover:text-red-400 p-1 rounded-lg transition-colors cursor-pointer"
-                    title="Remove from vault"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <span className="text-[11px] text-purple-400 font-mono">
+                    {(recipe.ingredients || []).length} ingr.
+                  </span>
                 </div>
 
-                <h3 className="text-lg font-serif font-bold text-white leading-tight">
-                  {r.title}
+                <h3 className="text-lg font-serif font-bold text-white group-hover:text-purple-200 transition-colors line-clamp-1">
+                  {recipe.title}
                 </h3>
 
-                {r.ingredients && r.ingredients.length > 0 && (
-                  <div className="text-xs text-purple-200/70 line-clamp-2">
-                    <strong className="text-purple-300 font-medium">Ingredients:</strong>{' '}
-                    {r.ingredients.map((i: any) => i.name).join(', ')}
-                  </div>
-                )}
+                <p className="text-xs text-purple-200/60 line-clamp-2 leading-relaxed">
+                  {(recipe.ingredients || []).map((i: any) => i.name).join(', ') || 'No ingredients listed'}
+                </p>
               </div>
 
-              {/* Frequency Cadence Dropdown */}
-              <div className="pt-4 mt-3 border-t border-white/5 flex items-center justify-between gap-3">
-                <span className="text-[11px] font-bold text-purple-300/80 font-mono">Rotation:</span>
+              {/* Bottom Frequency Selector & Delete */}
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="pt-3 border-t border-white/5 flex items-center justify-between gap-2"
+              >
                 <select
-                  value={r.frequency}
-                  onChange={(e) => handleUpdateFrequency(r.id, e.target.value)}
-                  className="bg-[#0b0813] border border-purple-800/40 text-purple-200 text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-purple-500 cursor-pointer"
+                  value={recipe.frequency}
+                  onChange={(e) => handleUpdateFrequency(recipe.id, e.target.value)}
+                  className="bg-[#0b0813] border border-purple-800/40 text-purple-200 text-xs font-semibold rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-purple-500 cursor-pointer min-w-[130px]"
                 >
                   {Object.entries(FREQUENCY_CONFIG).map(([k, meta]) => (
                     <option key={k} value={k}>
@@ -401,18 +323,50 @@ export function MiseRecipeVault({ onRefresh }: MiseRecipeVaultProps) {
                     </option>
                   ))}
                 </select>
+
+                <button
+                  onClick={() => handleDeleteRecipe(recipe.id, recipe.title)}
+                  className="p-1.5 text-purple-400/40 hover:text-red-400 rounded-lg transition-colors cursor-pointer"
+                  title="Delete from vault"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* ADD RECIPE MODAL */}
+      {/* FULL RECIPE DETAIL MODAL */}
+      {selectedRecipeForDetail && (
+        <MiseRecipeDetailModal
+          recipe={selectedRecipeForDetail}
+          onClose={() => setSelectedRecipeForDetail(null)}
+          onFrequencyChange={(id, freq) => {
+            handleUpdateFrequency(id, freq);
+            setSelectedRecipeForDetail((prev: any) => (prev ? { ...prev, frequency: freq } : null));
+          }}
+          onDelete={(id, title) => {
+            handleDeleteRecipe(id, title);
+            setSelectedRecipeForDetail(null);
+          }}
+        />
+      )}
+
+      {/* GOOGLE NOTES SCANNER MODAL */}
+      {showNotesModal && (
+        <MiseGoogleNotesModal
+          onClose={() => setShowNotesModal(false)}
+          onImportSuccess={onRefresh}
+        />
+      )}
+
+      {/* ADD RECIPE MODAL (URL & MANUAL) */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-[#140f20] border border-purple-900/40 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-[#140f20] border border-purple-900/40 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6">
             <div className="flex items-center justify-between pb-3 border-b border-white/5">
-              <h3 className="text-xl font-serif font-bold text-white">Add Recipe to Mise</h3>
+              <h3 className="text-xl font-serif font-bold text-white">Add Recipe to Vault</h3>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="text-purple-300/60 hover:text-white p-1 rounded-xl cursor-pointer"
@@ -421,70 +375,49 @@ export function MiseRecipeVault({ onRefresh }: MiseRecipeVaultProps) {
               </button>
             </div>
 
-            {/* Source Tab Selector */}
-            <div className="grid grid-cols-3 gap-2 bg-[#0b0813] p-1 rounded-2xl border border-purple-900/40 text-xs font-bold">
+            {/* Mode Switcher Tabs */}
+            <div className="bg-[#0b0813] p-1 rounded-xl flex items-center gap-1 text-xs">
               <button
-                onClick={() => setActiveAddTab('url')}
-                className={`py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  activeAddTab === 'url'
-                    ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-purple-300/60 hover:text-white'
+                onClick={() => setAddMode('url')}
+                className={`flex-1 py-2 rounded-lg font-bold transition-all cursor-pointer ${
+                  addMode === 'url' ? 'bg-purple-600 text-white' : 'text-purple-300/60 hover:text-white'
                 }`}
               >
-                <LinkIcon className="w-3.5 h-3.5" />
-                <span>Web URL</span>
+                Import from Web URL
               </button>
               <button
-                onClick={() => setActiveAddTab('manual')}
-                className={`py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  activeAddTab === 'manual'
-                    ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-purple-300/60 hover:text-white'
+                onClick={() => setAddMode('manual')}
+                className={`flex-1 py-2 rounded-lg font-bold transition-all cursor-pointer ${
+                  addMode === 'manual' ? 'bg-purple-600 text-white' : 'text-purple-300/60 hover:text-white'
                 }`}
               >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Manual</span>
-              </button>
-              <button
-                onClick={() => setActiveAddTab('cookbook')}
-                className={`py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  activeAddTab === 'cookbook'
-                    ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-purple-300/60 hover:text-white'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Cookbook</span>
+                Manual Entry
               </button>
             </div>
 
-            {/* TAB 1: WEB URL IMPORT */}
-            {activeAddTab === 'url' && (
-              <form onSubmit={handleImportUrl} className="space-y-4">
+            {addMode === 'url' ? (
+              <form onSubmit={handleParseUrl} className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
                     Recipe Web URL
                   </label>
                   <input
                     type="url"
-                    placeholder="https://www.seriouseats.com/..."
+                    placeholder="https://cooking.nytimes.com/recipes/..."
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
                     required
                     className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500"
                   />
-                  <p className="text-[11px] text-purple-300/50 mt-1">
-                    Paste any recipe URL (NYT Cooking, Serious Eats, food blogs). AI extracts ingredients & steps automatically.
-                  </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                    Rotation Frequency
+                    Rotation Cadence
                   </label>
                   <select
-                    value={urlFrequency}
-                    onChange={(e) => setUrlFrequency(e.target.value)}
+                    value={manualFrequency}
+                    onChange={(e) => setManualFrequency(e.target.value)}
                     className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
                   >
                     {Object.entries(FREQUENCY_CONFIG).map(([k, meta]) => (
@@ -505,19 +438,16 @@ export function MiseRecipeVault({ onRefresh }: MiseRecipeVaultProps) {
                   </button>
                   <button
                     type="submit"
-                    disabled={parsingUrl || !urlInput.trim()}
+                    disabled={urlParsing || !urlInput.trim()}
                     className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-1.5 cursor-pointer transition-all"
                   >
-                    <Sparkles className={`w-3.5 h-3.5 ${parsingUrl ? 'animate-spin' : ''}`} />
-                    <span>{parsingUrl ? 'Parsing Recipe...' : 'Import URL'}</span>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{urlParsing ? 'Extracting Recipe...' : 'Import Recipe'}</span>
                   </button>
                 </div>
               </form>
-            )}
-
-            {/* TAB 2: MANUAL ENTRY */}
-            {activeAddTab === 'manual' && (
-              <form onSubmit={handleSaveManual} className="space-y-4">
+            ) : (
+              <form onSubmit={handleManualSave} className="space-y-4 max-h-96 overflow-y-auto pr-1">
                 <div>
                   <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
                     Recipe Title *
@@ -542,37 +472,63 @@ export function MiseRecipeVault({ onRefresh }: MiseRecipeVaultProps) {
                       placeholder="e.g. 35 mins"
                       value={manualCookTime}
                       onChange={(e) => setManualCookTime(e.target.value)}
-                      className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500"
+                      className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-purple-500"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                      Rotation Frequency
+                      Servings
                     </label>
-                    <select
-                      value={manualFrequency}
-                      onChange={(e) => setManualFrequency(e.target.value)}
-                      className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
-                    >
-                      {Object.entries(FREQUENCY_CONFIG).map(([k, meta]) => (
-                        <option key={k} value={k}>
-                          {meta.label}
-                        </option>
-                      ))}
-                    </select>
+                    <input
+                      type="text"
+                      placeholder="e.g. 4 servings"
+                      value={manualServings}
+                      onChange={(e) => setManualServings(e.target.value)}
+                      className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-purple-500"
+                    />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                    Ingredients (one per line)
+                    Rotation Frequency
+                  </label>
+                  <select
+                    value={manualFrequency}
+                    onChange={(e) => setManualFrequency(e.target.value)}
+                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
+                  >
+                    {Object.entries(FREQUENCY_CONFIG).map(([k, meta]) => (
+                      <option key={k} value={k}>
+                        {meta.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
+                    Ingredients (1 per line)
                   </label>
                   <textarea
                     rows={4}
-                    placeholder="4 bone-in chicken thighs&#10;1 lb Yukon Gold potatoes&#10;2 cloves garlic&#10;Fresh rosemary"
+                    placeholder="2 lbs chicken thighs&#10;1 tbsp olive oil&#10;1 tsp smoked paprika&#10;2 cloves garlic"
                     value={manualIngredientsText}
                     onChange={(e) => setManualIngredientsText(e.target.value)}
-                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500 leading-relaxed"
+                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-purple-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
+                    Instructions / Method (Optional)
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Sear chicken on high heat for 6 mins per side..."
+                    value={manualInstructionsText}
+                    onChange={(e) => setManualInstructionsText(e.target.value)}
+                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-purple-500"
                   />
                 </div>
 
@@ -586,91 +542,13 @@ export function MiseRecipeVault({ onRefresh }: MiseRecipeVaultProps) {
                   </button>
                   <button
                     type="submit"
-                    disabled={savingManual || !manualTitle.trim()}
+                    disabled={savingRecipe || !manualTitle.trim()}
                     className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white text-xs font-bold rounded-xl shadow-lg cursor-pointer transition-all"
                   >
-                    <span>{savingManual ? 'Saving...' : 'Save Recipe'}</span>
+                    <span>{savingRecipe ? 'Saving...' : 'Save Recipe'}</span>
                   </button>
                 </div>
               </form>
-            )}
-
-            {/* TAB 3: 1-CLICK COOKBOOK IMPORT */}
-            {activeAddTab === 'cookbook' && (
-              <div className="space-y-4">
-                {cookbooks.length === 0 ? (
-                  <p className="text-xs text-purple-200/70 text-center py-6">
-                    No cookbooks found in your Recipeeks library.
-                  </p>
-                ) : (
-                  <>
-                    <div>
-                      <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                        Select Physical Cookbook
-                      </label>
-                      <select
-                        value={selectedCookbookId}
-                        onChange={(e) => {
-                          setSelectedCookbookId(e.target.value);
-                          fetchCookbookRecipes(e.target.value);
-                        }}
-                        className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
-                      >
-                        {cookbooks.map((cb) => (
-                          <option key={cb.id} value={cb.id}>
-                            {cb.title} ({cb.totalRecipes} recipes)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                      {cookbookRecipes.map((r) => {
-                        const isAlreadyImported = recipes.some((vr) => vr.title === r.title);
-                        return (
-                          <div
-                            key={r.id}
-                            className="p-3 rounded-xl bg-[#0b0813] border border-white/5 flex items-center justify-between gap-3 text-xs"
-                          >
-                            <div className="min-w-0">
-                              <span className="font-semibold text-white block truncate">
-                                {r.title}
-                              </span>
-                              {r.pageNumber && (
-                                <span className="text-[10px] text-purple-400 font-mono">
-                                  Page {r.pageNumber}
-                                </span>
-                              )}
-                            </div>
-
-                            <button
-                              onClick={() => handleImportCookbookRecipe(r.id)}
-                              disabled={isAlreadyImported || importingCookbookRecipe === r.id}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 flex items-center gap-1 transition-all cursor-pointer ${
-                                isAlreadyImported
-                                  ? 'bg-purple-950/60 text-purple-400/60 cursor-default'
-                                  : 'bg-purple-600 hover:bg-purple-500 text-white shadow-sm'
-                              }`}
-                            >
-                              {isAlreadyImported ? (
-                                <>
-                                  <Check className="w-3 h-3" />
-                                  <span>In Vault</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Plus className="w-3 h-3 stroke-[3]" />
-                                  <span>{importingCookbookRecipe === r.id ? 'Adding...' : 'Import'}</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
             )}
           </div>
         </div>

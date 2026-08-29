@@ -21,6 +21,8 @@ export async function GET(req: Request) {
       include: { ingredients: true },
     });
 
+    const activeRecipes = userRecipes.filter((r) => r.frequency !== 'paused');
+
     // Fetch pantry items
     const pantryItems = await db.pantryItem.findMany({
       where: { userId },
@@ -44,7 +46,7 @@ export async function GET(req: Request) {
     }
 
     // If no playlist or slots are empty and user has recipes, auto-generate initial playlist
-    if ((!playlistRecord || scheduledSlots.length === 0) && userRecipes.length > 0) {
+    if ((!playlistRecord || scheduledSlots.length === 0) && activeRecipes.length > 0) {
       const generated = generatePlaylistRotation(userRecipes, daysCount);
       scheduledSlots = generated.map((g) => ({
         day: g.day,
@@ -73,20 +75,55 @@ export async function GET(req: Request) {
       }
     }
 
-    // Hydrate slots with recipe details
+    // Check if any slot currently contains a paused or missing recipe
+    let slotsChanged = false;
+    const currentActiveIds = new Set(scheduledSlots.map((s) => s.recipeId));
+
+    scheduledSlots = scheduledSlots.map((slot) => {
+      const r = userRecipes.find((item) => item.id === slot.recipeId);
+      // If recipe doesn't exist or is paused (0x), replace it with an unpaused active recipe
+      if (!r || r.frequency === 'paused') {
+        slotsChanged = true;
+        let pool = activeRecipes.filter((cand) => !currentActiveIds.has(cand.id));
+        if (pool.length === 0) pool = activeRecipes;
+        if (pool.length > 0) {
+          const replacement = pool[Math.floor(Math.random() * pool.length)];
+          currentActiveIds.add(replacement.id);
+          return {
+            ...slot,
+            recipeId: replacement.id,
+            locked: false,
+          };
+        }
+      }
+      return slot;
+    });
+
+    if (slotsChanged && playlistRecord) {
+      await db.mealPlaylist.update({
+        where: { id: playlistRecord.id },
+        data: {
+          scheduleJson: JSON.stringify(scheduledSlots),
+        },
+      });
+    }
+
+    // Hydrate slots with active recipe details
     const hydratedSlots = scheduledSlots
       .map((slot) => {
         const r = userRecipes.find((item) => item.id === slot.recipeId);
+        // Strictly exclude any paused recipes
+        if (!r || r.frequency === 'paused') return null;
         return {
           day: slot.day,
           locked: !!slot.locked,
-          recipe: r || null,
+          recipe: r,
         };
       })
-      .filter((slot) => slot.recipe !== null);
+      .filter((slot): slot is { day: number; locked: boolean; recipe: any } => slot !== null);
 
     // Compute Grocery Delta for the active playlist
-    const activePlaylistRecipes = hydratedSlots.map((s) => s.recipe!);
+    const activePlaylistRecipes = hydratedSlots.map((s) => s.recipe);
     const groceryDelta = computeGroceryDelta(activePlaylistRecipes, pantryItems);
 
     return NextResponse.json({
@@ -96,7 +133,7 @@ export async function GET(req: Request) {
         daysCount,
         slots: hydratedSlots,
       },
-      availableRecipesCount: userRecipes.length,
+      availableRecipesCount: activeRecipes.length,
       groceryDelta,
     });
   } catch (err) {
@@ -124,9 +161,11 @@ export async function POST(req: Request) {
       include: { ingredients: true },
     });
 
-    if (userRecipes.length === 0) {
+    const activeRecipes = userRecipes.filter((r) => r.frequency !== 'paused');
+
+    if (activeRecipes.length === 0) {
       return NextResponse.json(
-        { error: 'Please add recipes to your Mise vault first before generating a playlist.' },
+        { error: 'Please unpause or add recipes to your Mise vault first before generating a playlist.' },
         { status: 400 }
       );
     }
@@ -216,22 +255,22 @@ export async function PATCH(req: Request) {
     );
 
     if (action === 'swap') {
-      // Find candidate recipes not currently in the playlist
+      // Find candidate recipes not currently in the playlist and not paused
       const currentRecipeIds = new Set(scheduledSlots.map((s) => s.recipeId));
       let pool = userRecipes.filter((r) => !currentRecipeIds.has(r.id) && r.frequency !== 'paused');
       if (pool.length === 0) {
-        // Fallback: any active recipe other than the current day's recipe
+        // Fallback: any active unpaused recipe other than the current day's recipe
         const currentSlot = scheduledSlots.find((s) => s.day === day);
         pool = userRecipes.filter((r) => r.id !== currentSlot?.recipeId && r.frequency !== 'paused');
       }
 
       if (pool.length === 0) {
-        return NextResponse.json({ error: 'No other recipes available to swap.' }, { status: 400 });
+        return NextResponse.json({ error: 'No other unpaused recipes available to swap.' }, { status: 400 });
       }
 
       // Pick random weighted candidate
       const targetRecipe = newRecipeId
-        ? userRecipes.find((r) => r.id === newRecipeId) || pool[0]
+        ? userRecipes.find((r) => r.id === newRecipeId && r.frequency !== 'paused') || pool[0]
         : pool[Math.floor(Math.random() * pool.length)];
 
       scheduledSlots = scheduledSlots.map((s) =>
@@ -254,17 +293,18 @@ export async function PATCH(req: Request) {
     const hydratedSlots = scheduledSlots
       .map((slot) => {
         const r = userRecipes.find((item) => item.id === slot.recipeId);
+        if (!r || r.frequency === 'paused') return null;
         return {
           day: slot.day,
           locked: !!slot.locked,
-          recipe: r || null,
+          recipe: r,
         };
       })
-      .filter((slot) => slot.recipe !== null);
+      .filter((slot): slot is { day: number; locked: boolean; recipe: any } => slot !== null);
 
     const pantryItems = await db.pantryItem.findMany({ where: { userId } });
     const groceryDelta = computeGroceryDelta(
-      hydratedSlots.map((s) => s.recipe!),
+      hydratedSlots.map((s) => s.recipe),
       pantryItems
     );
 
