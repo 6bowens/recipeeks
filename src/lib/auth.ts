@@ -1,5 +1,6 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import GoogleProvider from 'next-auth/providers/google';
 import bcrypt from 'bcryptjs';
 import { db } from './db';
 
@@ -16,6 +17,19 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      authorization: {
+        params: {
+          scope:
+            'openid email profile https://www.googleapis.com/auth/keep.readonly https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/documents.readonly',
+          prompt: 'consent',
+          access_type: 'offline',
+          response_type: 'code',
+        },
+      },
+    }),
     CredentialsProvider({
       id: 'credentials',
       name: 'Credentials',
@@ -35,6 +49,10 @@ export const authOptions: NextAuthOptions = {
 
         if (!user) {
           throw new Error('No user found with this email.');
+        }
+
+        if (!user.password) {
+          throw new Error('This account was created with Google Sign-In. Please sign in with Google.');
         }
 
         const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
@@ -93,13 +111,51 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async signIn({ user, account, profile }) {
+      if (account?.provider === 'google') {
+        const email = user.email?.toLowerCase().trim();
+        if (!email) return false;
+
+        const existingUser = await db.user.findUnique({
+          where: { email },
+        });
+
+        if (existingUser) {
+          await db.user.update({
+            where: { id: existingUser.id },
+            data: {
+              googleId: account.providerAccountId,
+              googleAccessToken: account.access_token || undefined,
+              googleRefreshToken: account.refresh_token || undefined,
+              name: existingUser.name || user.name,
+            },
+          });
+          user.id = existingUser.id;
+        } else {
+          const newUser = await db.user.create({
+            data: {
+              email,
+              name: user.name || email.split('@')[0],
+              googleId: account.providerAccountId,
+              googleAccessToken: account.access_token,
+              googleRefreshToken: account.refresh_token,
+            },
+          });
+          user.id = newUser.id;
+        }
+      }
+      return true;
+    },
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id;
         token.name = user.name;
         token.email = user.email;
         token.isImpersonating = (user as any).isImpersonating || false;
         token.originalAdminEmail = (user as any).originalAdminEmail || null;
+      }
+      if (account?.access_token) {
+        token.googleAccessToken = account.access_token;
       }
       return token;
     },
@@ -110,6 +166,7 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email as string;
         (session.user as any).isImpersonating = token.isImpersonating || false;
         (session.user as any).originalAdminEmail = token.originalAdminEmail || null;
+        (session.user as any).googleAccessToken = token.googleAccessToken || null;
       }
       return session;
     },

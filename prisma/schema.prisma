@@ -8,22 +8,25 @@ generator client {
 }
 
 model User {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  password      String
-  name          String?
-  aiSpendUsd    Float          @default(0.0)
-  spendLimitUsd Float          @default(20.0)
-  adminNotified Boolean        @default(false)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  cookbooks     Cookbook[]
-  pantryItems   PantryItem[]
-  scanSessions  ScanSession[]
-  aiLogs        AiUsageLog[]
-  customRecipes CustomRecipe[]
-  mealPlaylists MealPlaylist[]
-  mealHistory   MealHistory[]
+  id                 String         @id @default(cuid())
+  email              String         @unique
+  password           String?
+  name               String?
+  googleId           String?
+  googleAccessToken  String?
+  googleRefreshToken String?
+  aiSpendUsd         Float          @default(0.0)
+  spendLimitUsd      Float          @default(20.0)
+  adminNotified      Boolean        @default(false)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  cookbooks          Cookbook[]
+  pantryItems        PantryItem[]
+  scanSessions       ScanSession[]
+  aiLogs             AiUsageLog[]
+  customRecipes      CustomRecipe[]
+  mealPlaylists      MealPlaylist[]
+  mealHistory        MealHistory[]
 }
 
 model AiUsageLog {
