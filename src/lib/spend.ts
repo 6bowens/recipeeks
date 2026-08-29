@@ -58,7 +58,17 @@ export async function checkUserAiSpend(userId: string): Promise<SpendCheckResult
  */
 export async function recordAiSpend(
   userId: string,
-  actionType: 'bookshelf_scan' | 'recipe_index' | 'index_ocr' | 'fridge_scan' | 'cover_gen',
+  actionType:
+    | 'bookshelf_scan'
+    | 'recipe_index'
+    | 'index_ocr'
+    | 'fridge_scan'
+    | 'bar_scan'
+    | 'cover_gen'
+    | 'mise_recipe_gen'
+    | 'mise_notes_parse'
+    | 'mise_url_parse'
+    | string,
   costUsd: number = 0.01,
   promptChars: number = 0
 ): Promise<void> {

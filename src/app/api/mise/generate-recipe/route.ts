@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getGeminiClient, generateWithFallback } from '@/lib/gemini';
 import { deduceAisleCategory, cleanRecipeText, parseIngredientLine } from '@/lib/playlist-utils';
+import { checkUserAiSpend, recordAiSpend } from '@/lib/spend';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,19 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const spend = await checkUserAiSpend(session.user.id);
+    if (!spend.allowed) {
+      return NextResponse.json(
+        {
+          error: spend.error,
+          message: spend.message,
+          currentSpend: spend.currentSpend,
+          spendLimit: spend.spendLimit,
+        },
+        { status: 429 }
+      );
     }
 
     const { prompt, servings = '4', cookTime, style } = await req.json();
@@ -79,6 +93,8 @@ JSON Schema:
     const textResponse = await generateWithFallback(genAI, [aiPrompt], {
       responseMimeType: 'application/json',
     });
+
+    await recordAiSpend(session.user.id, 'mise_recipe_gen', 0.005, aiPrompt.length);
 
     const parsed = JSON.parse(textResponse);
 

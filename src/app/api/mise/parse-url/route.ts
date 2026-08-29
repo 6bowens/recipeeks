@@ -1,18 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { deduceAisleCategory } from '@/lib/playlist-utils';
+import { getGeminiClient, generateWithFallback } from '@/lib/gemini';
+import { deduceAisleCategory, cleanRecipeText } from '@/lib/playlist-utils';
+import { checkUserAiSpend, recordAiSpend } from '@/lib/spend';
 
 export const dynamic = 'force-dynamic';
-
-function getGeminiClient(): GoogleGenerativeAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
-    return null;
-  }
-  return new GoogleGenerativeAI(apiKey);
-}
 
 export async function POST(req: Request) {
   try {
@@ -90,6 +83,19 @@ export async function POST(req: Request) {
     }
 
     // 3. Fallback: Parse with Gemini
+    const spend = await checkUserAiSpend(session.user.id);
+    if (!spend.allowed) {
+      return NextResponse.json(
+        {
+          error: spend.error,
+          message: spend.message,
+          currentSpend: spend.currentSpend,
+          spendLimit: spend.spendLimit,
+        },
+        { status: 429 }
+      );
+    }
+
     const genAI = getGeminiClient();
     if (!genAI) {
       return NextResponse.json({
@@ -111,11 +117,6 @@ export async function POST(req: Request) {
       .replace(/\s+/g, ' ')
       .slice(0, 12000);
 
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-
     const prompt = `Extract the recipe from this webpage text. Return JSON with this schema:
     {
       "title": "Recipe Title",
@@ -132,8 +133,13 @@ export async function POST(req: Request) {
     Webpage text:
     ${strippedText}`;
 
-    const result = await model.generateContent(prompt);
-    const parsed = JSON.parse(result.response.text());
+    const textResponse = await generateWithFallback(genAI, [prompt], {
+      responseMimeType: 'application/json',
+    });
+
+    await recordAiSpend(session.user.id, 'mise_url_parse', 0.005, prompt.length);
+
+    const parsed = JSON.parse(textResponse);
 
     return NextResponse.json({
       success: true,
