@@ -205,17 +205,17 @@ export function MiseGroceryDelta({
         <div>
           <div className="flex items-center gap-2 mb-1.5">
             <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded font-mono">
-              Smart Shopping Delta
+              Smart Shopping List
             </span>
             <span className="text-xs text-purple-300/70 font-mono">
-              {groceryDelta.totalMissingCount} missing ingredients
+              {groceryDelta.totalMissingCount} items needed
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-serif font-bold text-white leading-tight">
-            Grocery Delta
+            Grocery List
           </h2>
           <p className="text-xs text-purple-200/60 mt-0.5">
-            Only the ingredients missing from your Recipeeks pantry, organized by aisle.
+            Ingredients missing from your home kitchen for this rotation, organized by aisle.
           </p>
         </div>
 

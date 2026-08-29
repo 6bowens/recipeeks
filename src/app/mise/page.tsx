@@ -83,7 +83,7 @@ function MiseContent() {
             }`}
           >
             <ShoppingCart className="w-4 h-4" />
-            <span>Grocery Delta</span>
+            <span>Grocery List</span>
             {playlistData?.groceryDelta?.totalMissingCount > 0 && (
               <span className="bg-purple-950 text-purple-200 border border-purple-400/50 text-[10px] px-1.5 py-0.2 rounded-full font-mono">
                 {playlistData.groceryDelta.totalMissingCount}

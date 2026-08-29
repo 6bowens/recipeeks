@@ -78,7 +78,7 @@ function NavbarContent() {
     {
       href: '/mise?tab=delta',
       tabId: 'delta',
-      label: 'Grocery Delta',
+      label: 'Grocery List',
       icon: ShoppingCart,
     },
     {
@@ -175,7 +175,7 @@ function NavbarContent() {
             ) : isCocktails ? (
               <Link
                 href="/mise"
-                title="Switch to Mise (Meal Playlist & Grocery Delta)"
+                title="Switch to Mise (Meal Playlist & Grocery List)"
                 className="flex items-center gap-2.5 group cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-charcoal-950 shadow-md group-hover:scale-105 transition-transform">

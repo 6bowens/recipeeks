@@ -413,10 +413,10 @@ export function MiseDinnerPlaylist({
         >
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-purple-200" />
-            <span>Generate Grocery Delta Shopping List</span>
+            <span>Generate Grocery Shopping List</span>
           </div>
           <div className="flex items-center gap-1 text-purple-200">
-            <span>View Delta</span>
+            <span>View List</span>
             <ArrowRight className="w-4 h-4" />
           </div>
         </button>
