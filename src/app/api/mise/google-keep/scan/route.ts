@@ -2,18 +2,10 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiClient, generateWithFallback } from '@/lib/gemini';
 import { deduceAisleCategory, cleanRecipeText } from '@/lib/playlist-utils';
 
 export const dynamic = 'force-dynamic';
-
-function getGeminiClient(): GoogleGenerativeAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
-    return null;
-  }
-  return new GoogleGenerativeAI(apiKey);
-}
 
 export async function GET(req: Request) {
   try {
@@ -167,11 +159,6 @@ export async function POST(req: Request) {
       });
     }
 
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-
     const combinedNotesSummary = rawNotes
       .map((n, idx) => `--- NOTE #${idx + 1} (Title: ${n.title}) ---\n${n.textContent}`)
       .join('\n\n')
@@ -205,8 +192,10 @@ JSON Schema:
 Notes to analyze:
 ${combinedNotesSummary}`;
 
-    const result = await model.generateContent(prompt);
-    const parsed = JSON.parse(result.response.text());
+    const textResponse = await generateWithFallback(genAI, [prompt], {
+      responseMimeType: 'application/json',
+    });
+    const parsed = JSON.parse(textResponse);
 
     const detectedRecipes = (parsed.recipes || []).map((r: any) => ({
       title: cleanRecipeText(r.title || 'Note Recipe'),

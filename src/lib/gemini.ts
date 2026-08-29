@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ExtractedCookbook, ExtractedRecipe, ExtractedIngredient } from '@/types';
 import { isRecognizedKitchenStaple, normalizeIngredientName } from '@/lib/utils';
 
-function getGeminiClient(): GoogleGenerativeAI | null {
+export function getGeminiClient(): GoogleGenerativeAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
     return null;
@@ -10,20 +10,22 @@ function getGeminiClient(): GoogleGenerativeAI | null {
   return new GoogleGenerativeAI(apiKey);
 }
 
-const MODEL_CANDIDATES = Array.from(
+export const MODEL_CANDIDATES = Array.from(
   new Set(
     [
       process.env.GEMINI_MODEL,
-      'gemini-3.6-flash',
-      'gemini-2.5-flash',
+      'gemini-2.0-flash',
       'gemini-1.5-flash',
+      'gemini-1.5-flash-latest',
+      'gemini-1.5-flash-8b',
       'gemini-1.5-pro',
+      'gemini-2.0-flash-exp',
       'gemini-pro',
     ].filter(Boolean) as string[]
   )
 );
 
-async function generateWithFallback(
+export async function generateWithFallback(
   genAI: GoogleGenerativeAI,
   promptParts: any[],
   config: { responseMimeType?: string; temperature?: number } = {}

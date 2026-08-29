@@ -1,18 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiClient, generateWithFallback } from '@/lib/gemini';
 import { deduceAisleCategory, cleanRecipeText } from '@/lib/playlist-utils';
 
 export const dynamic = 'force-dynamic';
-
-function getGeminiClient(): GoogleGenerativeAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
-    return null;
-  }
-  return new GoogleGenerativeAI(apiKey);
-}
 
 export async function POST(req: Request) {
   try {
@@ -55,11 +47,6 @@ export async function POST(req: Request) {
       });
     }
 
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      generationConfig: { responseMimeType: 'application/json' },
-    });
-
     const prompt = `You are a culinary AI assistant. The user copied notes from Google Keep / Google Notes, Apple Notes, or email containing one or multiple recipes with ingredients and instructions.
 Parse the text into an array of clean recipe objects.
 CRITICAL RULES:
@@ -73,21 +60,23 @@ JSON Schema:
   "recipes": [
     {
       "title": "Clean Recipe Title",
-      "servings": "2-4",
-      "cookTime": "30 mins",
+      "servings": "4",
+      "cookTime": "25 mins",
       "ingredients": [
-        { "name": "all-purpose flour", "amount": "2", "unit": "cups", "aisleCategory": "pantry" }
+        { "name": "boneless chicken thighs", "amount": "1.5", "unit": "lbs", "aisleCategory": "meat" }
       ],
-      "instructions": ["Step 1 description", "Step 2 description"]
+      "instructions": ["Step 1", "Step 2"]
     }
   ]
 }
 
-Note Text:
-${noteText.slice(0, 15000)}`;
+Note content:
+${noteText}`;
 
-    const result = await model.generateContent(prompt);
-    const parsed = JSON.parse(result.response.text());
+    const textResponse = await generateWithFallback(genAI, [prompt], {
+      responseMimeType: 'application/json',
+    });
+    const parsed = JSON.parse(textResponse);
 
     const cleanedRecipes = (parsed.recipes || []).map((r: any) => ({
       title: cleanRecipeText(r.title || 'Note Recipe'),
