@@ -15,6 +15,9 @@ import {
   Zap,
   Globe,
   Loader2,
+  Copy,
+  ExternalLink,
+  ShieldAlert,
 } from 'lucide-react';
 import { FREQUENCY_CONFIG } from '@/lib/playlist-utils';
 
@@ -29,9 +32,11 @@ export function MiseGoogleNotesModal({ onClose, onImportSuccess }: MiseGoogleNot
 
   // Google OAuth Live Scanner State
   const [isGoogleConnected, setIsGoogleConnected] = useState<boolean | null>(null);
+  const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [scanningGoogle, setScanningGoogle] = useState(false);
   const [googleScannedNotesCount, setGoogleScannedNotesCount] = useState<number | null>(null);
+  const [copiedUri, setCopiedUri] = useState(false);
 
   // Paste Scanner State
   const [noteText, setNoteText] = useState('');
@@ -44,13 +49,15 @@ export function MiseGoogleNotesModal({ onClose, onImportSuccess }: MiseGoogleNot
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    // Check if user has Google Auth connected
+    // Check if user has Google Auth configured & connected
     fetch('/api/mise/google-keep/scan')
       .then((res) => res.json())
       .then((data) => {
+        setIsConfigured(!!data.isConfigured);
         setIsGoogleConnected(!!data.connected);
       })
       .catch(() => {
+        setIsConfigured(false);
         setIsGoogleConnected(false);
       })
       .finally(() => {
@@ -59,6 +66,10 @@ export function MiseGoogleNotesModal({ onClose, onImportSuccess }: MiseGoogleNot
   }, []);
 
   const handleConnectGoogle = () => {
+    if (!isConfigured) {
+      alert('Google OAuth Client ID & Secret are not configured yet. See setup instructions below or use the Paste Notes tab.');
+      return;
+    }
     signIn('google', {
       callbackUrl: window.location.href,
     });
@@ -166,6 +177,16 @@ export function MiseGoogleNotesModal({ onClose, onImportSuccess }: MiseGoogleNot
     } finally {
       setSavingBatch(false);
     }
+  };
+
+  const callbackUri = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/auth/callback/google`
+    : 'http://Brettflix:6968/api/auth/callback/google';
+
+  const copyCallbackUri = () => {
+    navigator.clipboard.writeText(callbackUri);
+    setCopiedUri(true);
+    setTimeout(() => setCopiedUri(false), 2500);
   };
 
   return (
@@ -304,7 +325,7 @@ export function MiseGoogleNotesModal({ onClose, onImportSuccess }: MiseGoogleNot
             </div>
           ) : scanTab === 'google_auth' ? (
             /* TAB 1: GOOGLE LIVE OAUTH SCAN */
-            <div className="space-y-5 text-center py-4">
+            <div className="space-y-4 py-2">
               {checkingConnection ? (
                 <div className="py-8 flex flex-col items-center gap-2 text-purple-300/60 text-xs">
                   <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
@@ -333,7 +354,7 @@ export function MiseGoogleNotesModal({ onClose, onImportSuccess }: MiseGoogleNot
                     <span>{scanningGoogle ? 'Scanning All Notes with AI...' : 'Scan Google Keep Notes'}</span>
                   </button>
                 </div>
-              ) : (
+              ) : isConfigured ? (
                 <div className="bg-purple-950/40 border border-purple-800/40 rounded-2xl p-6 space-y-4 text-center">
                   <div className="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center justify-center mx-auto shadow-md">
                     <Globe className="w-6 h-6" />
@@ -343,7 +364,7 @@ export function MiseGoogleNotesModal({ onClose, onImportSuccess }: MiseGoogleNot
                       Connect Google Account
                     </h4>
                     <p className="text-xs text-purple-200/70 mt-1 max-w-sm mx-auto">
-                      Sign in with Google to grant read access to your Keep and Notes. You can disconnect at any time.
+                      Sign in with Google to grant read access to your Keep and Notes.
                     </p>
                   </div>
 
@@ -371,6 +392,68 @@ export function MiseGoogleNotesModal({ onClose, onImportSuccess }: MiseGoogleNot
                     </svg>
                     <span>Connect with Google</span>
                   </button>
+                </div>
+              ) : (
+                /* GOOGLE OAUTH SETUP GUIDE */
+                <div className="bg-[#100b1a] border border-amber-500/30 rounded-2xl p-5 space-y-4 text-left">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
+                      <ShieldAlert className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-serif font-bold text-sm text-white">
+                        Google Cloud OAuth Credentials Required
+                      </h4>
+                      <p className="text-xs text-purple-200/70 mt-0.5 leading-relaxed">
+                        To enable direct Google Keep scanning, Google requires registering an OAuth Client ID for your self-hosted server.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-[#0b0813] rounded-xl p-3.5 border border-white/5 space-y-2.5 text-xs text-purple-200/80">
+                    <span className="font-bold text-purple-300 font-mono text-[11px] block">
+                      Quick 1-Minute Setup:
+                    </span>
+                    <ol className="list-decimal list-inside space-y-1.5 text-[11px] leading-relaxed">
+                      <li>
+                        Go to{' '}
+                        <a
+                          href="https://console.cloud.google.com/apis/credentials"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-purple-400 underline hover:text-purple-300 font-semibold inline-flex items-center gap-0.5"
+                        >
+                          Google Cloud Credentials <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      </li>
+                      <li>Create Credentials → <strong>OAuth client ID</strong> → <strong>Web application</strong>.</li>
+                      <li>Add this Authorized Redirect URI:</li>
+                    </ol>
+
+                    <div className="flex items-center justify-between gap-2 bg-black/50 border border-purple-800/40 rounded-lg p-2 font-mono text-[10px] text-purple-200">
+                      <span className="truncate">{callbackUri}</span>
+                      <button
+                        onClick={copyCallbackUri}
+                        className="p-1 text-purple-400 hover:text-white shrink-0 cursor-pointer"
+                        title="Copy Redirect URI"
+                      >
+                        {copiedUri ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+
+                    <p className="text-[10px] text-purple-300/60 pt-1">
+                      Add <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> into <code>~/docker/recipeeks/.env</code> on Brettflix.
+                    </p>
+                  </div>
+
+                  <div className="text-center pt-1">
+                    <button
+                      onClick={() => setScanTab('paste')}
+                      className="text-xs text-purple-400 hover:text-purple-300 font-semibold underline cursor-pointer"
+                    >
+                      Or switch to &quot;Paste Notes&quot; tab to import without OAuth →
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

@@ -17,9 +17,10 @@ function getGeminiClient(): GoogleGenerativeAI | null {
 
 export async function GET(req: Request) {
   try {
+    const isConfigured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ isConfigured, connected: false });
     }
 
     const user = await db.user.findUnique({
@@ -30,6 +31,7 @@ export async function GET(req: Request) {
     const isConnected = !!(user?.googleAccessToken || (session.user as any).googleAccessToken);
 
     return NextResponse.json({
+      isConfigured,
       connected: isConnected,
       email: user?.email,
     });

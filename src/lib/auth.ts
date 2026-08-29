@@ -11,15 +11,13 @@ export function isUserAdmin(email?: string | null): boolean {
   return ADMIN_EMAILS.includes(email.toLowerCase().trim());
 }
 
-export const authOptions: NextAuthOptions = {
-  session: {
-    strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  providers: [
+const providers: any[] = [];
+
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  providers.push(
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       authorization: {
         params: {
           scope:
@@ -29,87 +27,98 @@ export const authOptions: NextAuthOptions = {
           response_type: 'code',
         },
       },
-    }),
-    CredentialsProvider({
-      id: 'credentials',
-      name: 'Credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email', placeholder: 'chef@example.com' },
-        password: { label: 'Password', type: 'password' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Please provide both email and password.');
-        }
+    })
+  );
+}
 
-        const email = credentials.email.toLowerCase().trim();
-        const user = await db.user.findUnique({
-          where: { email },
-        });
+providers.push(
+  CredentialsProvider({
+    id: 'credentials',
+    name: 'Credentials',
+    credentials: {
+      email: { label: 'Email', type: 'email', placeholder: 'chef@example.com' },
+      password: { label: 'Password', type: 'password' },
+    },
+    async authorize(credentials) {
+      if (!credentials?.email || !credentials?.password) {
+        throw new Error('Please provide both email and password.');
+      }
 
-        if (!user) {
-          throw new Error('No user found with this email.');
-        }
+      const email = credentials.email.toLowerCase().trim();
+      const user = await db.user.findUnique({
+        where: { email },
+      });
 
-        if (!user.password) {
-          throw new Error('This account was created with Google Sign-In. Please sign in with Google.');
-        }
+      if (!user) {
+        throw new Error('No user found with this email.');
+      }
 
-        const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
-        if (!isPasswordValid) {
-          throw new Error('Incorrect password.');
-        }
+      if (!user.password) {
+        throw new Error('This account was created with Google Sign-In. Please sign in with Google.');
+      }
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name || user.email.split('@')[0],
-        };
-      },
-    }),
-    CredentialsProvider({
-      id: 'impersonate',
-      name: 'Impersonate',
-      credentials: {
-        targetUserId: { label: 'Target User ID', type: 'text' },
-        adminEmail: { label: 'Admin Email', type: 'text' },
-        secretKey: { label: 'Secret Key', type: 'password' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.targetUserId || !credentials?.adminEmail || !credentials?.secretKey) {
-          throw new Error('Invalid impersonation credentials.');
-        }
+      const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+      if (!isPasswordValid) {
+        throw new Error('Incorrect password.');
+      }
 
-        const adminEmail = credentials.adminEmail.toLowerCase().trim();
-        if (!isUserAdmin(adminEmail)) {
-          throw new Error('Unauthorized: Admin access required.');
-        }
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name || user.email.split('@')[0],
+      };
+    },
+  }),
+  CredentialsProvider({
+    id: 'impersonate',
+    name: 'Impersonate',
+    credentials: {
+      targetUserId: { label: 'Target User ID', type: 'text' },
+      adminEmail: { label: 'Admin Email', type: 'text' },
+      secretKey: { label: 'Secret Key', type: 'password' },
+    },
+    async authorize(credentials) {
+      if (!credentials?.targetUserId || !credentials?.adminEmail || !credentials?.secretKey) {
+        throw new Error('Invalid impersonation credentials.');
+      }
 
-        const expectedSecret = process.env.NEXTAUTH_SECRET || 'recipeeks-default-dev-secret-key-321';
-        if (credentials.secretKey !== expectedSecret) {
-          throw new Error('Invalid impersonation secret key.');
-        }
+      const adminEmail = credentials.adminEmail.toLowerCase().trim();
+      if (!isUserAdmin(adminEmail)) {
+        throw new Error('Unauthorized: Admin access required.');
+      }
 
-        const targetUser = await db.user.findUnique({
-          where: { id: credentials.targetUserId },
-        });
+      const expectedSecret = process.env.NEXTAUTH_SECRET || 'recipeeks-default-dev-secret-key-321';
+      if (credentials.secretKey !== expectedSecret) {
+        throw new Error('Invalid impersonation secret key.');
+      }
 
-        if (!targetUser) {
-          throw new Error('Target user not found.');
-        }
+      const targetUser = await db.user.findUnique({
+        where: { id: credentials.targetUserId },
+      });
 
-        const isReturningToAdmin = targetUser.email.toLowerCase() === adminEmail;
+      if (!targetUser) {
+        throw new Error('Target user not found.');
+      }
 
-        return {
-          id: targetUser.id,
-          email: targetUser.email,
-          name: targetUser.name || targetUser.email.split('@')[0],
-          isImpersonating: !isReturningToAdmin,
-          originalAdminEmail: adminEmail,
-        } as any;
-      },
-    }),
-  ],
+      const isReturningToAdmin = targetUser.email.toLowerCase() === adminEmail;
+
+      return {
+        id: targetUser.id,
+        email: targetUser.email,
+        name: targetUser.name || targetUser.email.split('@')[0],
+        isImpersonating: !isReturningToAdmin,
+        originalAdminEmail: adminEmail,
+      } as any;
+    },
+  })
+);
+
+export const authOptions: NextAuthOptions = {
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  providers,
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider === 'google') {
