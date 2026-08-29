@@ -34,8 +34,13 @@ export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [selectedRecipeForDetail, setSelectedRecipeForDetail] = useState<any | null>(null);
 
-  // Manual Add Form State
-  const [addMode, setAddMode] = useState<'url' | 'manual'>('url');
+  // Add Modal Form State
+  const [addMode, setAddMode] = useState<'ai' | 'url' | 'manual'>('ai');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiServings, setAiServings] = useState('4');
+  const [aiCookTime, setAiCookTime] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+
   const [urlInput, setUrlInput] = useState('');
   const [urlParsing, setUrlParsing] = useState(false);
   const [manualTitle, setManualTitle] = useState('');
@@ -46,6 +51,47 @@ export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
   const [manualInstructionsText, setManualInstructionsText] = useState('');
   const [manualNotes, setManualNotes] = useState('');
   const [savingRecipe, setSavingRecipe] = useState(false);
+
+  const handleGenerateAiRecipe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiPrompt.trim()) return;
+
+    try {
+      setAiGenerating(true);
+      const res = await fetch('/api/mise/generate-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: aiPrompt.trim(),
+          servings: aiServings,
+          cookTime: aiCookTime || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to generate recipe');
+      }
+
+      const data = await res.json();
+      if (data.recipe) {
+        setManualTitle(data.recipe.title);
+        setManualCookTime(data.recipe.cookTime || '30 mins');
+        setManualServings(data.recipe.servings || '4');
+        setManualNotes(data.recipe.notes || '');
+        setManualInstructionsText((data.recipe.instructions || []).join('\n'));
+        const ingLines = (data.recipe.ingredients || [])
+          .map((i: any) => [i.amount, i.unit, i.name].filter(Boolean).join(' '))
+          .join('\n');
+        setManualIngredientsText(ingLines);
+        setAddMode('manual'); // Seamlessly transition to review & save
+      }
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setAiGenerating(false);
+    }
+  };
 
   const handleUpdateFrequency = async (recipeId: string, frequency: string) => {
     try {
@@ -382,12 +428,21 @@ export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
             {/* Mode Switcher Tabs */}
             <div className="bg-[#0b0813] p-1 rounded-xl flex items-center gap-1 text-xs">
               <button
+                onClick={() => setAddMode('ai')}
+                className={`flex-1 py-2 rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  addMode === 'ai' ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md' : 'text-purple-300/60 hover:text-white'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>AI Generator</span>
+              </button>
+              <button
                 onClick={() => setAddMode('url')}
                 className={`flex-1 py-2 rounded-lg font-bold transition-all cursor-pointer ${
                   addMode === 'url' ? 'bg-purple-600 text-white' : 'text-purple-300/60 hover:text-white'
                 }`}
               >
-                Import from Web URL
+                Web URL
               </button>
               <button
                 onClick={() => setAddMode('manual')}
@@ -395,11 +450,114 @@ export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
                   addMode === 'manual' ? 'bg-purple-600 text-white' : 'text-purple-300/60 hover:text-white'
                 }`}
               >
-                Manual Entry
+                Manual
               </button>
             </div>
 
-            {addMode === 'url' ? (
+            {addMode === 'ai' ? (
+              <form onSubmit={handleGenerateAiRecipe} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
+                    Describe Dish or Ingredients
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="e.g. chicken thighs + veg, creamy lemon garlic salmon, 15-min spicy noodle bowl..."
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    required
+                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl p-3 text-xs focus:outline-none focus:border-purple-500 leading-relaxed"
+                  />
+                </div>
+
+                {/* Quick Suggestion Chips */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold text-purple-400/70 uppercase tracking-wider font-mono">
+                    Quick Ideas
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {[
+                      '🍗 Chicken thighs + veg',
+                      '🍝 Creamy lemon garlic pasta',
+                      '🌮 Crispy carnitas tacos',
+                      '🥩 Steak & blistered peppers',
+                      '🍲 Hearty white bean stew',
+                    ].map((chip, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setAiPrompt(chip.replace(/^[^a-zA-Z0-9]+/, ''))}
+                        className="bg-white/5 hover:bg-purple-500/20 border border-white/5 hover:border-purple-500/40 text-purple-200 text-[11px] px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-purple-300 font-mono mb-1">
+                      Servings
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 4"
+                      value={aiServings}
+                      onChange={(e) => setAiServings(e.target.value)}
+                      className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-purple-300 font-mono mb-1">
+                      Cook Time (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 30 mins"
+                      value={aiCookTime}
+                      onChange={(e) => setAiCookTime(e.target.value)}
+                      className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
+                    Rotation Cadence
+                  </label>
+                  <select
+                    value={manualFrequency}
+                    onChange={(e) => setManualFrequency(e.target.value)}
+                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
+                  >
+                    {Object.entries(FREQUENCY_CONFIG).map(([k, meta]) => (
+                      <option key={k} value={k}>
+                        {meta.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="pt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="px-4 py-2 text-xs font-bold text-purple-300/60 hover:text-white cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={aiGenerating || !aiPrompt.trim()}
+                    className="px-6 py-2.5 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-600 hover:from-purple-500 hover:to-purple-400 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 ${aiGenerating ? 'animate-spin' : ''}`} />
+                    <span>{aiGenerating ? 'Creating Recipe...' : 'Generate Recipe'}</span>
+                  </button>
+                </div>
+              </form>
+            ) : addMode === 'url' ? (
               <form onSubmit={handleParseUrl} className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
