@@ -24,6 +24,7 @@ import {
   Search,
   ChevronDown,
   Flame,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { MatchedRecipeResult } from '@/types';
 import { CUT_CATEGORIES, CutCategory } from '@/lib/cut-utils';
@@ -84,6 +85,28 @@ export function RecipeMatcher() {
       } catch (e) {}
       return updated;
     });
+  };
+
+  const [miseAddingId, setMiseAddingId] = useState<string | null>(null);
+  const [miseToast, setMiseToast] = useState<string | null>(null);
+
+  const handleAddToMise = async (recipeId: string, title: string) => {
+    try {
+      setMiseAddingId(recipeId);
+      const res = await fetch('/api/mise/import-cookbook-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipeId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to add');
+      setMiseToast(data.message || `✨ Added "${title}" to Mise!`);
+      setTimeout(() => setMiseToast(null), 3000);
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setMiseAddingId(null);
+    }
   };
 
   const handleUnhideAll = () => {
@@ -240,6 +263,14 @@ export function RecipeMatcher() {
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full max-w-full overflow-x-hidden">
+      {/* Mise Toast Notification */}
+      {miseToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-purple-950 border border-purple-500 text-purple-200 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 font-semibold text-xs">
+          <UtensilsCrossed className="w-4 h-4 text-purple-400" />
+          <span>{miseToast}</span>
+        </div>
+      )}
+
       {/* Hero match header */}
       <div className="bg-gradient-to-r from-crimson-950 via-crimson-900 to-rose-900 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6">
         <div>
@@ -639,6 +670,21 @@ export function RecipeMatcher() {
                             {item.matchScore}%
                           </span>
                         )}
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddToMise(item.recipeId, item.recipeTitle);
+                          }}
+                          disabled={miseAddingId === item.recipeId}
+                          className="inline-flex items-center gap-1 p-1 sm:px-2 sm:py-0.5 rounded-md bg-purple-50 hover:bg-purple-100 text-purple-800 text-[10px] font-semibold border border-purple-200 transition-colors cursor-pointer"
+                          title="Save recipe to Mise rotation vault"
+                        >
+                          <UtensilsCrossed className="w-2.5 h-2.5 text-purple-700" />
+                          <span className="hidden sm:inline">
+                            {miseAddingId === item.recipeId ? 'Adding...' : 'Mise'}
+                          </span>
+                        </button>
 
                         <a
                           href={`https://www.google.com/search?q=${encodeURIComponent(`${item.cookbookTitle} ${item.recipeTitle} recipe`)}`}

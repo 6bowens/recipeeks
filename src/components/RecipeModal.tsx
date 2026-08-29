@@ -22,6 +22,7 @@ import {
   Upload,
   Link as LinkIcon,
   Loader2,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { BudgetLimitModal } from '@/components/BudgetLimitModal';
 
@@ -85,6 +86,29 @@ export function RecipeModal({
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [tempPageNumber, setTempPageNumber] = useState<string>('');
   const [isSavingPage, setIsSavingPage] = useState(false);
+
+  // Mise import state
+  const [miseAddingId, setMiseAddingId] = useState<string | null>(null);
+  const [miseToast, setMiseToast] = useState<string | null>(null);
+
+  const handleAddToMise = async (recipeId: string, title: string) => {
+    try {
+      setMiseAddingId(recipeId);
+      const res = await fetch('/api/mise/import-cookbook-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipeId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to add');
+      setMiseToast(data.message || `✨ Added "${title}" to Mise!`);
+      setTimeout(() => setMiseToast(null), 3000);
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setMiseAddingId(null);
+    }
+  };
 
   // Index scan state
   const [isScanningIndex, setIsScanningIndex] = useState(false);
@@ -359,6 +383,14 @@ export function RecipeModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-charcoal-950/75 backdrop-blur-sm flex justify-center items-end sm:items-center sm:p-4">
+      {/* Mise Toast Notification */}
+      {miseToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-purple-950 border border-purple-500 text-purple-200 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 font-semibold text-xs">
+          <UtensilsCrossed className="w-4 h-4 text-purple-400" />
+          <span>{miseToast}</span>
+        </div>
+      )}
+
       <div className="bg-white w-full max-w-4xl h-[94dvh] sm:h-auto sm:max-h-[90vh] rounded-t-3xl sm:rounded-2xl shadow-2xl border border-red-900/10 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header with Book Cover Styling */}
@@ -600,18 +632,32 @@ export function RecipeModal({
                   {/* Expanded Recipe Details */}
                   {isExpanded && (
                     <div className="px-3 pb-3 pt-1 border-t border-red-200/50 bg-white/80 rounded-b-xl space-y-2.5">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <span className="text-[11px] font-semibold uppercase tracking-wider text-charcoal-600">
                           Ingredients ({completedCount}/{totalCount} checked)
                         </span>
-                        <a
-                          href={webSearchUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 hover:text-red-900 hover:underline"
-                        >
-                          Search Online <ExternalLink className="w-3 h-3" />
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddToMise(recipe.id, recipe.title);
+                            }}
+                            disabled={miseAddingId === recipe.id}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 transition-colors cursor-pointer"
+                          >
+                            <UtensilsCrossed className="w-3 h-3 text-purple-700" />
+                            <span>{miseAddingId === recipe.id ? 'Adding...' : 'Add to Mise'}</span>
+                          </button>
+
+                          <a
+                            href={webSearchUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 hover:text-red-900 hover:underline"
+                          >
+                            Search Online <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
                       </div>
 
                       {/* Ingredient checklist grid */}

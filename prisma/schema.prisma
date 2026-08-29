@@ -21,11 +21,13 @@ model User {
   pantryItems   PantryItem[]
   scanSessions  ScanSession[]
   aiLogs        AiUsageLog[]
+  customRecipes CustomRecipe[]
+  mealPlaylists MealPlaylist[]
 }
 
 model AiUsageLog {
   id          String   @id @default(cuid())
-  actionType  String   // bookshelf_scan, recipe_index, index_ocr, fridge_scan, cover_gen
+  actionType  String   // bookshelf_scan, recipe_index, index_ocr, fridge_scan, cover_gen, url_parse
   costUsd     Float    @default(0.0)
   promptChars Int      @default(0)
   userId      String
@@ -117,6 +119,57 @@ model ScanSession {
   userId         String
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt      DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model CustomRecipe {
+  id                String                   @id @default(cuid())
+  title             String
+  sourceType        String                   @default("manual") // "manual", "url", "cookbook"
+  sourceUrl         String?
+  cookbookTitle     String?
+  pageNumber        Int?
+  frequency         String                   @default("1_week") // "1_week", "2_month", "1_month", "occasional", "paused"
+  servings          String?                  @default("2-4")
+  prepTime          String?
+  cookTime          String?
+  instructions      String?                  // JSON string array or markdown text
+  notes             String?
+  userId            String
+  user              User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ingredients       CustomRecipeIngredient[]
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@index([userId])
+}
+
+model CustomRecipeIngredient {
+  id             String       @id @default(cuid())
+  name           String
+  normalizedName String
+  amount         String?
+  unit           String?
+  aisleCategory  String       @default("pantry") // produce, meat, dairy, pantry, spices, other
+  optional       Boolean      @default(false)
+  recipeId       String
+  recipe         CustomRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([recipeId])
+  @@index([normalizedName])
+}
+
+model MealPlaylist {
+  id           String    @id @default(cuid())
+  name         String    @default("Dinner Rotation")
+  daysCount    Int       @default(3) // 3 or 4
+  scheduleJson String    // JSON string of array: [{ day: 1, recipeId: "...", locked: boolean }]
+  active       Boolean   @default(true)
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([userId])
 }

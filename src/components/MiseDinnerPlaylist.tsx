@@ -1,0 +1,366 @@
+'use client';
+
+import React, { useState } from 'react';
+import {
+  Sparkles,
+  Shuffle,
+  Lock,
+  Unlock,
+  RotateCcw,
+  Clock,
+  Users,
+  ChevronRight,
+  ExternalLink,
+  BookOpen,
+  ListOrdered,
+  Plus,
+  ArrowRight,
+  CheckCircle2,
+  Calendar,
+} from 'lucide-react';
+import { FREQUENCY_CONFIG } from '@/lib/playlist-utils';
+
+interface MiseDinnerPlaylistProps {
+  playlist: {
+    id: string;
+    daysCount: number;
+    slots: {
+      day: number;
+      locked: boolean;
+      recipe: any;
+    }[];
+  } | null;
+  availableRecipesCount: number;
+  onRefresh: () => void;
+  onGoToDelta: () => void;
+  onGoToVault: () => void;
+}
+
+export function MiseDinnerPlaylist({
+  playlist,
+  availableRecipesCount,
+  onRefresh,
+  onGoToDelta,
+  onGoToVault,
+}: MiseDinnerPlaylistProps) {
+  const [selectedDayTab, setSelectedDayTab] = useState<number>(1);
+  const [generating, setGenerating] = useState(false);
+  const [swappingDay, setSwappingDay] = useState<number | null>(null);
+  const [daysCount, setDaysCount] = useState<number>(playlist?.daysCount || 3);
+  const [selectedRecipeDetail, setSelectedRecipeDetail] = useState<any | null>(null);
+
+  const handleGenerate = async (newDays?: number) => {
+    try {
+      setGenerating(true);
+      const targetDays = newDays || daysCount;
+      const pinned = (playlist?.slots || [])
+        .filter((s) => s.locked)
+        .map((s) => ({ day: s.day, recipeId: s.recipe.id }));
+
+      const res = await fetch('/api/mise/playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          daysCount: targetDays,
+          pinnedSlots: pinned,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to generate playlist');
+      }
+
+      onRefresh();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleSwapSlot = async (day: number) => {
+    try {
+      setSwappingDay(day);
+      const res = await fetch('/api/mise/playlist', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'swap', day }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to swap meal');
+      }
+
+      onRefresh();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setSwappingDay(null);
+    }
+  };
+
+  const handleToggleLock = async (day: number) => {
+    try {
+      const res = await fetch('/api/mise/playlist', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'lock', day }),
+      });
+
+      if (!res.ok) throw new Error('Failed to toggle lock');
+      onRefresh();
+    } catch (err) {
+      alert((err as Error).message);
+    }
+  };
+
+  if (!playlist || playlist.slots.length === 0) {
+    return (
+      <div className="bg-[#140f20] border border-purple-900/30 rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto space-y-5 shadow-2xl">
+        <div className="w-16 h-16 rounded-2xl bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center justify-center mx-auto shadow-md">
+          <Calendar className="w-8 h-8" />
+        </div>
+        <div>
+          <h3 className="text-2xl font-serif font-bold text-white">Your Dinner Playlist</h3>
+          <p className="text-xs sm:text-sm text-purple-200/70 mt-1.5 leading-relaxed">
+            {availableRecipesCount === 0
+              ? 'Add a few favorite recipes to your vault (or import from your Recipeeks cookbooks) to generate a customized 3 to 4 day rotation.'
+              : `You have ${availableRecipesCount} recipe(s) ready in your vault. Generate your customized dinner rotation.`}
+          </p>
+        </div>
+
+        {availableRecipesCount === 0 ? (
+          <button
+            onClick={onGoToVault}
+            className="px-6 py-3.5 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-600 hover:from-purple-500 hover:to-purple-400 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-2 mx-auto cursor-pointer transition-all"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Add Recipes to Vault</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => handleGenerate(3)}
+            disabled={generating}
+            className="px-6 py-3.5 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-600 hover:from-purple-500 hover:to-purple-400 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-2 mx-auto cursor-pointer transition-all"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>{generating ? 'Rolling Playlist...' : 'Generate 3-Day Rotation'}</span>
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const currentSlots = playlist.slots;
+  const activeSlot = currentSlots.find((s) => s.day === selectedDayTab) || currentSlots[0];
+
+  return (
+    <div className="space-y-6">
+      {/* Top Header & Duration Controls */}
+      <div className="bg-gradient-to-r from-[#120d1f] via-[#1a122c] to-[#120d1f] rounded-3xl p-5 sm:p-7 border border-purple-900/30 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
+              Active Rotation
+            </span>
+            <span className="text-xs text-purple-300/70 font-mono">
+              {availableRecipesCount} recipes in rotation
+            </span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-serif font-bold text-white leading-tight">
+            Dinner Playlist
+          </h2>
+          <p className="text-xs text-purple-200/60 mt-0.5">
+            Rotated based on how often you love each meal.
+          </p>
+        </div>
+
+        {/* Days Count & Regenerate Buttons */}
+        <div className="flex items-center gap-2.5 w-full sm:w-auto flex-wrap justify-between sm:justify-end">
+          <div className="bg-[#0b0813] border border-purple-900/40 p-1 rounded-xl flex items-center gap-1 text-xs">
+            <button
+              onClick={() => {
+                setDaysCount(3);
+                handleGenerate(3);
+              }}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                playlist.daysCount === 3
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'text-purple-300/60 hover:text-white'
+              }`}
+            >
+              3 Days
+            </button>
+            <button
+              onClick={() => {
+                setDaysCount(4);
+                handleGenerate(4);
+              }}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                playlist.daysCount === 4
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'text-purple-300/60 hover:text-white'
+              }`}
+            >
+              4 Days
+            </button>
+          </div>
+
+          <button
+            onClick={() => handleGenerate()}
+            disabled={generating}
+            className="px-4 py-2 bg-white/10 hover:bg-white/20 border border-purple-500/30 text-purple-200 hover:text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+          >
+            <Shuffle className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
+            <span>{generating ? 'Rolling...' : 'Re-roll Playlist'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Swipeable Day Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {currentSlots.map((slot) => {
+          const isSelected = selectedDayTab === slot.day;
+          return (
+            <button
+              key={slot.day}
+              onClick={() => setSelectedDayTab(slot.day)}
+              className={`px-4 py-2.5 rounded-2xl border text-left shrink-0 transition-all cursor-pointer flex items-center gap-2.5 ${
+                isSelected
+                  ? 'bg-purple-950/80 border-purple-500 text-white shadow-lg ring-1 ring-purple-500/30'
+                  : 'bg-[#140f20]/80 border-white/5 text-purple-200/60 hover:border-purple-800/40 hover:text-white'
+              }`}
+            >
+              <div className="leading-tight">
+                <span className="text-[10px] font-bold uppercase tracking-wider block font-mono text-purple-400">
+                  Day {slot.day}
+                </span>
+                <span className="text-xs font-bold truncate max-w-[120px] block text-white">
+                  {slot.recipe.title}
+                </span>
+              </div>
+              {slot.locked && <Lock className="w-3 h-3 text-amber-400 shrink-0" />}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Active Day Detail Card */}
+      {activeSlot && (
+        <div className="bg-[#140f20] rounded-3xl border border-purple-900/30 p-6 sm:p-8 shadow-2xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/5">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded font-mono">
+                  Day {activeSlot.day} Dinner
+                </span>
+                <span className="bg-white/10 text-purple-200 text-[10px] font-semibold px-2 py-0.5 rounded">
+                  {FREQUENCY_CONFIG[activeSlot.recipe.frequency]?.shortLabel || 'Custom'}
+                </span>
+                {activeSlot.recipe.sourceType === 'cookbook' && (
+                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+                    <BookOpen className="w-3 h-3" /> {activeSlot.recipe.cookbookTitle}
+                  </span>
+                )}
+              </div>
+              <h3 className="text-2xl font-serif font-bold text-white leading-tight">
+                {activeSlot.recipe.title}
+              </h3>
+            </div>
+
+            {/* Quick Slot Actions (Swap / Lock) */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => handleToggleLock(activeSlot.day)}
+                title={activeSlot.locked ? 'Unlock meal for shuffle' : 'Lock meal to preserve during shuffle'}
+                className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+                  activeSlot.locked
+                    ? 'bg-amber-950/60 border-amber-500 text-amber-300'
+                    : 'bg-white/5 border-white/10 text-purple-300 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                {activeSlot.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                <span>{activeSlot.locked ? 'Pinned' : 'Pin Meal'}</span>
+              </button>
+
+              <button
+                onClick={() => handleSwapSlot(activeSlot.day)}
+                disabled={swappingDay === activeSlot.day}
+                className="px-3.5 py-2.5 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${swappingDay === activeSlot.day ? 'animate-spin' : ''}`} />
+                <span>Swap Dish</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Specs */}
+          <div className="flex items-center gap-4 text-xs text-purple-200/70">
+            {activeSlot.recipe.cookTime && (
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-purple-400" /> {activeSlot.recipe.cookTime}
+              </span>
+            )}
+            {activeSlot.recipe.servings && (
+              <span className="flex items-center gap-1">
+                <Users className="w-3.5 h-3.5 text-purple-400" /> {activeSlot.recipe.servings} Servings
+              </span>
+            )}
+            {activeSlot.recipe.sourceUrl && (
+              <a
+                href={activeSlot.recipe.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-purple-400 hover:text-purple-300 flex items-center gap-1 underline"
+              >
+                <span>View Web Recipe</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+
+          {/* Ingredients Grid */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-purple-400 font-mono">
+              Key Ingredients ({activeSlot.recipe.ingredients?.length || 0})
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {activeSlot.recipe.ingredients?.map((ing: any, i: number) => (
+                <div
+                  key={i}
+                  className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 text-xs text-purple-100 flex items-center justify-between"
+                >
+                  <span>{ing.name}</span>
+                  {ing.amount && (
+                    <span className="text-purple-300/60 font-mono text-[11px]">
+                      {ing.amount} {ing.unit || ''}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Bottom Action Banner to Grocery Delta */}
+      <div className="pt-2">
+        <button
+          onClick={onGoToDelta}
+          className="w-full p-4 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-600 hover:from-purple-500 hover:to-fuchsia-500 text-white rounded-2xl shadow-xl flex items-center justify-between font-bold text-xs sm:text-sm cursor-pointer transition-all hover:scale-[1.01]"
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-purple-200" />
+            <span>Generate Grocery Delta Shopping List</span>
+          </div>
+          <div className="flex items-center gap-1 text-purple-200">
+            <span>View Delta</span>
+            <ArrowRight className="w-4 h-4" />
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+}
