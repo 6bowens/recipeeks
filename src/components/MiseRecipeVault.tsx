@@ -324,10 +324,6 @@ export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
                     <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
                       <BookOpen className="w-2.5 h-2.5" /> {recipe.cookbookTitle || 'Cookbook'}
                     </span>
-                  ) : recipe.sourceType === 'google_notes' ? (
-                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
-                      📝 Google Notes
-                    </span>
                   ) : recipe.sourceType === 'url' ? (
                     <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
                       <span>Web</span>

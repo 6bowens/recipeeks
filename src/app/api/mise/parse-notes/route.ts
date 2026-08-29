@@ -39,7 +39,7 @@ export async function POST(req: Request) {
             frequency: defaultFrequency,
             servings: '2-4',
             cookTime: '30 mins',
-            sourceType: 'google_notes',
+            sourceType: 'manual',
             ingredients,
             instructions: [],
           },
@@ -84,7 +84,7 @@ ${noteText}`;
       prepTime: r.prepTime || '',
       cookTime: r.cookTime || '',
       frequency: defaultFrequency,
-      sourceType: 'google_notes',
+      sourceType: 'manual',
       ingredients: (r.ingredients || []).map((ing: any) => {
         const cName = cleanRecipeText(ing.name || '');
         return {
