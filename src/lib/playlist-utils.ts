@@ -400,6 +400,22 @@ export interface GroceryDeltaItem {
   isStocked: boolean;
 }
 
+export function isIngredientStockedInPantry(
+  ingredientName: string,
+  pantryItems: { name: string; normalizedName?: string; isAlwaysAvailable?: boolean }[]
+): boolean {
+  if (!ingredientName) return false;
+  const targetNorm = normalizeIngredientName(ingredientName);
+  return pantryItems.some((item) => {
+    const itemNorm = item.normalizedName || normalizeIngredientName(item.name);
+    if (itemNorm === targetNorm) return true;
+    if (item.name.toLowerCase() === ingredientName.toLowerCase()) return true;
+    if (targetNorm.includes(itemNorm) || itemNorm.includes(targetNorm)) return true;
+    const tokens = targetNorm.split(' ').filter((w) => w.length > 2);
+    return tokens.some((tok) => itemNorm.includes(tok));
+  });
+}
+
 export function computeGroceryDelta(
   playlistRecipes: { id: string; title: string; ingredients: { name: string; amount?: string | null; unit?: string | null; aisleCategory?: string }[] }[],
   pantryItems: { name: string; normalizedName?: string; isAlwaysAvailable?: boolean }[]
@@ -409,22 +425,8 @@ export function computeGroceryDelta(
   totalMissingCount: number;
   totalStockedCount: number;
 } {
-  const pantryNormalized = pantryItems.map((p) => ({
-    name: p.name,
-    norm: p.normalizedName || normalizeIngredientName(p.name),
-    isAlwaysAvailable: p.isAlwaysAvailable,
-  }));
-
-  const isStockedInPantry = (ingredientName: string) => {
-    const targetNorm = normalizeIngredientName(ingredientName);
-    return pantryNormalized.some((item) => {
-      if (item.norm === targetNorm) return true;
-      if (item.name.toLowerCase() === ingredientName.toLowerCase()) return true;
-      if (targetNorm.includes(item.norm) || item.norm.includes(targetNorm)) return true;
-      const tokens = targetNorm.split(' ').filter((w) => w.length > 2);
-      return tokens.some((tok) => item.norm.includes(tok));
-    });
-  };
+  const isStockedInPantry = (ingredientName: string) =>
+    isIngredientStockedInPantry(ingredientName, pantryItems);
 
   // Aggregate ingredients across all playlist recipes
   const itemMap = new Map<

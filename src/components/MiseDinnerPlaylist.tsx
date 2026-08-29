@@ -427,6 +427,7 @@ export function MiseDinnerPlaylist({
         <MiseRecipeDetailModal
           recipe={selectedRecipeDetail}
           onClose={() => setSelectedRecipeDetail(null)}
+          onPantryChange={onRefresh}
           onMarkCooked={(r) => handleMarkCooked(activeSlot.day, r)}
           onSaveRecipe={(updated) => {
             setSelectedRecipeDetail(updated);

@@ -384,6 +384,7 @@ export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
         <MiseRecipeDetailModal
           recipe={selectedRecipeForDetail}
           onClose={() => setSelectedRecipeForDetail(null)}
+          onPantryChange={onRefresh}
           onFrequencyChange={(id, freq) => {
             handleUpdateFrequency(id, freq);
             setSelectedRecipeForDetail((prev: any) => (prev ? { ...prev, frequency: freq } : null));
