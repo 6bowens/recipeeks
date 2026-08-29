@@ -22,12 +22,14 @@ import {
   BookmarkCheck,
   ShoppingBag,
   RefreshCw,
-  AlertTriangle,
   ArrowRight,
+  AlertTriangle,
+  Receipt,
 } from 'lucide-react';
 import { PantryItemData } from '@/types';
 import { KITCHEN_STAPLES, isRecognizedKitchenStaple } from '@/lib/utils';
 import { BudgetLimitModal } from '@/components/BudgetLimitModal';
+import { ReceiptScannerModal } from '@/components/ReceiptScannerModal';
 
 interface DetectedPantryItem extends PantryItemData {
   selected?: boolean;
@@ -58,6 +60,7 @@ export function PantryManager() {
   const [newItemCategory, setNewItemCategory] = useState<'fridge' | 'freezer' | 'pantry' | 'spices'>('fridge');
   const [newItemAlways, setNewItemAlways] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -423,12 +426,23 @@ export function PantryManager() {
 
           <button
             type="button"
+            onClick={() => setShowReceiptModal(true)}
+            disabled={scanning}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white font-bold text-xs sm:text-sm shadow-md transition-all disabled:opacity-50 cursor-pointer"
+            title="Scan a supermarket receipt with AI OCR"
+          >
+            <Receipt className="w-4 h-4 text-white" />
+            <span>Scan Receipt</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={scanning}
             className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs sm:text-sm backdrop-blur-md border border-white/20 shadow-md transition-all disabled:opacity-50 cursor-pointer"
           >
             <Upload className="w-4 h-4 text-rose-200" />
-            <span>Photo Library</span>
+            <span>Library</span>
           </button>
 
           <button
@@ -929,6 +943,13 @@ export function PantryManager() {
         currentSpend={budgetModal.currentSpend}
         spendLimit={budgetModal.spendLimit}
         message={budgetModal.message}
+      />
+
+      {/* Grocery Receipt Scanner Modal */}
+      <ReceiptScannerModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        onSuccess={fetchPantry}
       />
     </div>
   );

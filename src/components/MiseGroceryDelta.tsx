@@ -14,8 +14,11 @@ import {
   Share2,
   ExternalLink,
   Layers,
+  Receipt,
+  PackageCheck,
 } from 'lucide-react';
 import { AISLE_LABELS, AisleCategory, GroceryDeltaItem } from '@/lib/playlist-utils';
+import { ReceiptScannerModal } from '@/components/ReceiptScannerModal';
 
 interface MiseGroceryDeltaProps {
   groceryDelta: {
@@ -37,12 +40,50 @@ export function MiseGroceryDelta({
   const [stocking, setStocking] = useState(false);
   const [copied, setCopied] = useState(false);
   const [keepCopied, setKeepCopied] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
   const toggleCheck = (id: string) => {
     setCheckedIds((prev) => ({
       ...prev,
       [id]: !prev[id],
     }));
+  };
+
+  const handleStockAllMissingInPantry = async () => {
+    if (!groceryDelta || groceryDelta.totalMissingCount === 0) return;
+    const allMissing = Object.values(groceryDelta.missingByAisle).flat();
+    if (allMissing.length === 0) return;
+
+    if (!confirm(`Add all ${allMissing.length} missing ingredient(s) into your Recipeeks Pantry as in-stock?`)) {
+      return;
+    }
+
+    try {
+      setStocking(true);
+      const itemsPayload = allMissing.map((item) => ({
+        name: item.name,
+        category: item.aisleCategory === 'produce' || item.aisleCategory === 'meat' || item.aisleCategory === 'dairy' ? 'fridge' : 'pantry',
+        quantity: item.amount || null,
+      }));
+
+      const res = await fetch('/api/pantry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: itemsPayload }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to update pantry');
+      }
+
+      setCheckedIds({});
+      onRefresh();
+      alert(`✨ All ${allMissing.length} ingredient(s) added to your Pantry and marked stocked!`);
+    } catch (err) {
+      alert('Error stocking items: ' + (err as Error).message);
+    } finally {
+      setStocking(false);
+    }
   };
 
   const handleStockCheckedInPantry = async () => {
@@ -57,15 +98,20 @@ export function MiseGroceryDelta({
         return;
       }
 
-      for (const item of itemsToStock) {
-        await fetch('/api/pantry', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: item.name,
-            category: item.aisleCategory === 'produce' || item.aisleCategory === 'meat' || item.aisleCategory === 'dairy' ? 'fridge' : 'pantry',
-          }),
-        });
+      const itemsPayload = itemsToStock.map((item) => ({
+        name: item.name,
+        category: item.aisleCategory === 'produce' || item.aisleCategory === 'meat' || item.aisleCategory === 'dairy' ? 'fridge' : 'pantry',
+        quantity: item.amount || null,
+      }));
+
+      const res = await fetch('/api/pantry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: itemsPayload }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to update pantry');
       }
 
       setCheckedIds({});
@@ -173,35 +219,59 @@ export function MiseGroceryDelta({
           </p>
         </div>
 
-        {/* Action Buttons (Google Keep & Stock) */}
+        {/* Action Buttons (Scan Receipt, Stock All, Google Keep, Copy) */}
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-between sm:justify-end">
           <button
+            type="button"
+            onClick={() => setShowReceiptModal(true)}
+            className="px-3.5 py-2.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95"
+            title="Take a photo of your supermarket receipt to automatically add items"
+          >
+            <Receipt className="w-3.5 h-3.5" />
+            <span>Scan Receipt</span>
+          </button>
+
+          {checkedCount > 0 ? (
+            <button
+              type="button"
+              onClick={handleStockCheckedInPantry}
+              disabled={stocking}
+              className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Stock {checkedCount} Checked</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleStockAllMissingInPantry}
+              disabled={stocking}
+              className="px-3.5 py-2.5 bg-emerald-600/80 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95 border border-emerald-500/40"
+              title="Add all missing ingredients into your Recipeeks pantry as in-stock"
+            >
+              <PackageCheck className="w-3.5 h-3.5" />
+              <span>Stock All ({groceryDelta.totalMissingCount})</span>
+            </button>
+          )}
+
+          <button
+            type="button"
             onClick={handleExportToGoogleKeep}
             className="px-3.5 py-2.5 bg-gradient-to-r from-amber-600/40 via-amber-500/40 to-amber-600/40 hover:from-amber-600/60 hover:to-amber-500/60 border border-amber-500/40 text-amber-200 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95"
             title="Export checklist to Google Keep / Google Notes"
           >
             <Share2 className="w-3.5 h-3.5" />
-            <span>{keepCopied ? 'Copied & Opening Keep...' : 'Add to Google Notes'}</span>
+            <span>{keepCopied ? 'Copied & Opening Keep...' : 'Add to Notes'}</span>
           </button>
 
           <button
+            type="button"
             onClick={handleCopyToClipboard}
             className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 border border-purple-500/30 text-purple-200 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copied ? 'Copied!' : 'Copy Checklist'}</span>
+            <span>{copied ? 'Copied!' : 'Copy'}</span>
           </button>
-
-          {checkedCount > 0 && (
-            <button
-              onClick={handleStockCheckedInPantry}
-              disabled={stocking}
-              className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Stock {checkedCount} in Pantry</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -274,6 +344,13 @@ export function MiseGroceryDelta({
           </div>
         </div>
       )}
+
+      {/* Grocery Receipt Scanner Modal */}
+      <ReceiptScannerModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        onSuccess={onRefresh}
+      />
     </div>
   );
 }

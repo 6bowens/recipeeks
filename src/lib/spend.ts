@@ -64,10 +64,12 @@ export async function recordAiSpend(
     | 'index_ocr'
     | 'fridge_scan'
     | 'bar_scan'
+    | 'receipt_scan'
     | 'cover_gen'
     | 'mise_recipe_gen'
     | 'mise_notes_parse'
     | 'mise_url_parse'
+    | 'mise_receipt_scan'
     | string,
   costUsd: number = 0.01,
   promptChars: number = 0

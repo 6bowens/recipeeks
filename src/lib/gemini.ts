@@ -730,3 +730,115 @@ Output format: Return ONLY a valid JSON array of objects:
   }
 }
 
+export interface ExtractedReceiptItem {
+  name: string;
+  quantity?: string;
+  category: 'produce' | 'meat' | 'dairy' | 'pantry' | 'spices' | 'other';
+  price?: string;
+  isAlwaysAvailable?: boolean;
+}
+
+/**
+ * Scan a supermarket / grocery store receipt photo to extract purchased ingredients
+ */
+export async function scanGroceryReceiptImage(
+  imageData: string | { base64Data: string; mimeType: string }[],
+  defaultMimeType: string = 'image/jpeg'
+): Promise<ExtractedReceiptItem[]> {
+  const genAI = getGeminiClient();
+
+  const images: { base64Data: string; mimeType: string }[] = [];
+  if (typeof imageData === 'string') {
+    if (imageData.trim()) {
+      images.push({
+        base64Data: imageData.replace(/^data:image\/[a-z]+;base64,/, ''),
+        mimeType: defaultMimeType,
+      });
+    }
+  } else if (Array.isArray(imageData)) {
+    imageData.forEach((img) => {
+      if (img?.base64Data) {
+        images.push({
+          base64Data: img.base64Data.replace(/^data:image\/[a-z]+;base64,/, ''),
+          mimeType: img.mimeType || 'image/jpeg',
+        });
+      }
+    });
+  }
+
+  if (!genAI || images.length === 0) {
+    console.warn('Returning mock receipt items.');
+    const mockReceipt = [
+      { name: 'Boneless Skinless Chicken Thighs', quantity: '2 lbs', category: 'meat' as const, price: '$7.99' },
+      { name: 'Organic Roma Tomatoes', quantity: '1.5 lbs', category: 'produce' as const, price: '$3.49' },
+      { name: 'Fresh Garlic', quantity: '1 bulb', category: 'produce' as const, price: '$0.79' },
+      { name: 'Heavy Whipping Cream', quantity: '1 pint', category: 'dairy' as const, price: '$2.99' },
+      { name: 'Parmigiano-Reggiano', quantity: '8 oz', category: 'dairy' as const, price: '$6.49' },
+      { name: 'Rigatoni Pasta', quantity: '1 lb', category: 'pantry' as const, price: '$1.99' },
+      { name: 'Extra Virgin Olive Oil', quantity: '1 bottle', category: 'pantry' as const, price: '$8.99' },
+    ];
+    return mockReceipt.map((i) => ({
+      ...i,
+      isAlwaysAvailable: isRecognizedKitchenStaple(i.name),
+    }));
+  }
+
+  const prompt = `
+You are an expert grocery receipt OCR and culinary data extractor AI.
+Analyze the photograph(s) of this grocery store / supermarket receipt (Trader Joe's, Costco, Safeway, Whole Foods, Kroger, etc.).
+
+Extraction & Normalization Rules:
+1. Extract ALL food items, produce, proteins, dairy, dry goods, seasonings, and beverages.
+2. EXPAND abbreviated or cryptic register printouts into clean, natural culinary names:
+   - "ORG BNLS SKN CHK THGH" -> "Boneless Skinless Chicken Thighs"
+   - "ROMA TOMATO 1.5LB" -> name: "Roma Tomatoes", quantity: "1.5 lbs"
+   - "OATLY OAT MLK 64Z" -> name: "Oat Milk", quantity: "64 oz"
+   - "KIRKLAND EVOO 1L" -> name: "Extra Virgin Olive Oil", quantity: "1 L"
+   - "TJ GRLC BULB" -> name: "Garlic", quantity: "1 bulb"
+   - "HELLMANNS REAL MAYO" -> name: "Mayonnaise"
+   - "YELLOW ONION 3CT" -> name: "Yellow Onions", quantity: "3"
+3. FILTER OUT non-food line items (e.g. paper towels, trash bags, batteries, napkins, coupons, discounts, bag fees, bottle deposits, subtotal, tax, total, payment info).
+4. Categorize every item into exactly one of: "produce", "meat", "dairy", "pantry", "spices", "other".
+5. Capture the quantity and line price if visible on the receipt.
+
+Output Format: Return ONLY a valid JSON array of objects:
+[
+  {
+    "name": "Clean Ingredient Name",
+    "quantity": "2 lbs",
+    "category": "produce",
+    "price": "$3.49"
+  }
+]
+`;
+
+  const imageParts = images.map((img) => ({
+    inlineData: {
+      data: img.base64Data,
+      mimeType: img.mimeType,
+    },
+  }));
+
+  try {
+    const responseText = await generateWithFallback(genAI, [prompt, ...imageParts], {
+      responseMimeType: 'application/json',
+      temperature: 0.1,
+    });
+    const parsed = JSON.parse(responseText);
+    const list = Array.isArray(parsed) ? parsed : [parsed];
+    return list
+      .filter((i: any) => i && i.name)
+      .map((item: any) => ({
+        name: item.name.trim(),
+        quantity: item.quantity ? String(item.quantity).trim() : undefined,
+        category: (item.category || 'pantry') as 'produce' | 'meat' | 'dairy' | 'pantry' | 'spices' | 'other',
+        price: item.price ? String(item.price).trim() : undefined,
+        isAlwaysAvailable: isRecognizedKitchenStaple(item.name),
+      }));
+  } catch (error) {
+    console.error('Error scanning grocery receipt:', error);
+    throw new Error('Failed to analyze grocery receipt: ' + (error as Error).message);
+  }
+}
+
+
