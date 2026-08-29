@@ -428,6 +428,10 @@ export function MiseDinnerPlaylist({
           recipe={selectedRecipeDetail}
           onClose={() => setSelectedRecipeDetail(null)}
           onMarkCooked={(r) => handleMarkCooked(activeSlot.day, r)}
+          onSaveRecipe={(updated) => {
+            setSelectedRecipeDetail(updated);
+            onRefresh();
+          }}
         />
       )}
     </div>

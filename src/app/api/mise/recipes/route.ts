@@ -203,6 +203,56 @@ export async function PATCH(req: Request) {
       },
     });
 
+    if (Array.isArray(body.ingredients)) {
+      await db.customRecipeIngredient.deleteMany({
+        where: { recipeId: id },
+      });
+
+      const newIngredients = body.ingredients
+        .map((ing: any) => {
+          const rawName = typeof ing === 'string' ? ing : ing.name || '';
+          let cleanedName = cleanRecipeText(rawName);
+          if (!cleanedName) return null;
+
+          let amount = ing.amount ? cleanRecipeText(String(ing.amount)) : null;
+          let unit = ing.unit ? cleanRecipeText(String(ing.unit)) : null;
+          let aisleCategory = ing.aisleCategory || null;
+
+          if (!amount) {
+            const parsed = parseIngredientLine(rawName);
+            if (parsed.amount) {
+              amount = parsed.amount;
+              unit = parsed.unit || null;
+              cleanedName = parsed.name;
+            }
+            if (!aisleCategory) {
+              aisleCategory = parsed.aisleCategory;
+            }
+          }
+
+          if (!aisleCategory) {
+            aisleCategory = deduceAisleCategory(cleanedName);
+          }
+
+          return {
+            recipeId: id,
+            name: cleanedName,
+            normalizedName: normalizeIngredientName(cleanedName),
+            amount: amount || null,
+            unit: unit || null,
+            aisleCategory,
+            optional: !!ing.optional,
+          };
+        })
+        .filter(Boolean);
+
+      if (newIngredients.length > 0) {
+        await db.customRecipeIngredient.createMany({
+          data: newIngredients,
+        });
+      }
+    }
+
     // If recipe was set to paused (0x), immediately check active playlist and swap it out if present
     if (frequency === 'paused') {
       const activePlaylist = await db.mealPlaylist.findFirst({

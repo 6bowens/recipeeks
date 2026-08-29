@@ -350,6 +350,10 @@ export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
             handleDeleteRecipe(id, title);
             setSelectedRecipeForDetail(null);
           }}
+          onSaveRecipe={(updated) => {
+            setSelectedRecipeForDetail(updated);
+            onRefresh();
+          }}
         />
       )}
 
