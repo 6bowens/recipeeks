@@ -192,11 +192,11 @@ export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-between sm:justify-end">
           <button
             onClick={() => setShowNotesModal(true)}
-            className="px-4 py-3 bg-gradient-to-r from-amber-600/30 to-amber-500/30 hover:from-amber-600/50 hover:to-amber-500/50 border border-amber-500/40 text-amber-200 hover:text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
-            title="Scan one or multiple recipes copied from Google Notes / Google Keep"
+            className="px-4 py-3 bg-gradient-to-r from-purple-600/30 to-fuchsia-600/30 hover:from-purple-600/50 hover:to-fuchsia-600/50 border border-purple-500/40 text-purple-200 hover:text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+            title="Paste notes or text to automatically extract and import recipes"
           >
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <span>Scan Google Notes</span>
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span>Paste & Scan Notes</span>
           </button>
 
           <button
