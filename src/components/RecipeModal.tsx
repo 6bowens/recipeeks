@@ -113,6 +113,7 @@ export function RecipeModal({
   // Index scan state
   const [isScanningIndex, setIsScanningIndex] = useState(false);
   const indexFileInputRef = useRef<HTMLInputElement>(null);
+  const cameraIndexInputRef = useRef<HTMLInputElement>(null);
 
   // Cover Image Picker State
   const [showCoverPicker, setShowCoverPicker] = useState(false);
@@ -123,6 +124,7 @@ export function RecipeModal({
   const [isSavingCover, setIsSavingCover] = useState(false);
   const [isGeneratingAiCover, setIsGeneratingAiCover] = useState(false);
   const coverUploadInputRef = useRef<HTMLInputElement>(null);
+  const cameraCoverInputRef = useRef<HTMLInputElement>(null);
 
   // Update local state when prop changes
   useEffect(() => {
@@ -469,7 +471,16 @@ export function RecipeModal({
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {/* Scan Printed Index Page Button */}
+            {/* Scan Printed Index Page (Direct Camera) */}
+            <input
+              type="file"
+              ref={cameraIndexInputRef}
+              onChange={handleIndexPhotoUpload}
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+            />
+            {/* Scan Printed Index Page (Photo Library) */}
             <input
               type="file"
               ref={indexFileInputRef}
@@ -478,13 +489,13 @@ export function RecipeModal({
               className="hidden"
             />
             <button
-              onClick={() => indexFileInputRef.current?.click()}
+              onClick={() => cameraIndexInputRef.current?.click()}
               disabled={isScanningIndex}
-              title="Snap a photo of the printed Index or Table of Contents"
+              title="Snap a photo of the printed Index or Table of Contents with your phone camera"
               className="text-xs text-charcoal-800 bg-white hover:bg-red-50 border border-red-200 px-2.5 py-1.5 rounded-lg font-semibold flex items-center gap-1 transition-colors shadow-2xs cursor-pointer touch-manipulation"
             >
               <Camera className="w-3.5 h-3.5 text-red-700" />
-              <span className="hidden sm:inline">{isScanningIndex ? 'Reading...' : 'Scan Index'}</span>
+              <span>{isScanningIndex ? 'Reading...' : 'Snap Index'}</span>
             </button>
 
             {/* Change Cover Toolbar Button (Extra accessible) */}
@@ -815,6 +826,26 @@ export function RecipeModal({
                   </button>
                 )}
 
+                {/* Direct Camera Cover Capture Input */}
+                <input
+                  type="file"
+                  ref={cameraCoverInputRef}
+                  onChange={handleUploadCustomCover}
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => cameraCoverInputRef.current?.click()}
+                  className="px-2.5 py-1.5 bg-red-50 border border-red-200 text-red-900 hover:bg-red-100 rounded-lg font-semibold flex items-center justify-center gap-1 shadow-2xs whitespace-nowrap text-xs shrink-0 cursor-pointer"
+                  title="Snap a photo of the cookbook cover with phone camera"
+                >
+                  <Camera className="w-3 h-3 text-red-700" />
+                  <span>Snap Cover</span>
+                </button>
+
+                {/* Library Cover Upload Input */}
                 <input
                   type="file"
                   ref={coverUploadInputRef}
@@ -823,11 +854,13 @@ export function RecipeModal({
                   className="hidden"
                 />
                 <button
+                  type="button"
                   onClick={() => coverUploadInputRef.current?.click()}
-                  className="px-2.5 py-1.5 bg-white border border-red-200 text-charcoal-800 hover:bg-red-50 rounded-lg font-medium flex items-center justify-center gap-1 shadow-2xs whitespace-nowrap text-xs shrink-0"
+                  className="px-2.5 py-1.5 bg-white border border-red-200 text-charcoal-800 hover:bg-red-50 rounded-lg font-medium flex items-center justify-center gap-1 shadow-2xs whitespace-nowrap text-xs shrink-0 cursor-pointer"
+                  title="Choose from photo library"
                 >
-                  <Upload className="w-3 h-3 text-red-700" />
-                  Upload
+                  <Upload className="w-3 h-3 text-charcoal-600" />
+                  <span>Upload</span>
                 </button>
               </div>
             </div>

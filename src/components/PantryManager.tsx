@@ -60,6 +60,7 @@ export function PantryManager() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const fetchPantry = async () => {
     try {
@@ -389,7 +390,18 @@ export function PantryManager() {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
+          {/* Direct Camera Capture Input */}
+          <input
+            type="file"
+            ref={cameraInputRef}
+            onChange={handlePhotosSelected}
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+          />
+
+          {/* Photo Library Multi-file Input */}
           <input
             type="file"
             ref={fileInputRef}
@@ -400,20 +412,33 @@ export function PantryManager() {
           />
 
           <button
-            onClick={() => fileInputRef.current?.click()}
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
             disabled={scanning}
-            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white text-red-950 font-bold text-sm hover:bg-red-50 shadow-md transition-all disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white text-red-950 font-bold text-xs sm:text-sm hover:bg-red-50 shadow-md transition-all disabled:opacity-50 cursor-pointer"
           >
             <Camera className="w-4 h-4 text-red-700" />
-            Add Photo(s)
+            <span>Take Photo</span>
           </button>
 
           <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={scanning}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs sm:text-sm backdrop-blur-md border border-white/20 shadow-md transition-all disabled:opacity-50 cursor-pointer"
+          >
+            <Upload className="w-4 h-4 text-rose-200" />
+            <span>Photo Library</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleSampleFridge}
             disabled={scanning}
-            className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl bg-black/30 hover:bg-black/40 text-rose-100 font-medium text-xs backdrop-blur-md transition-all"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl bg-black/30 hover:bg-black/40 text-rose-100 font-medium text-xs backdrop-blur-md transition-all cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5 text-rose-300" /> Sample Fridge
+            <Sparkles className="w-3.5 h-3.5 text-rose-300" />
+            <span>Sample Fridge</span>
           </button>
         </div>
       </div>

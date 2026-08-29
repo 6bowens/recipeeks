@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   RotateCcw,
+  Upload,
 } from 'lucide-react';
 import { PantryItemData } from '@/types';
 import { isRecognizedBarStaple } from '@/lib/cocktail-utils';
@@ -61,6 +62,7 @@ export function BarManager() {
   }>({ isOpen: false });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const fetchBarItems = async () => {
     try {
@@ -258,7 +260,18 @@ export function BarManager() {
           </p>
         </div>
 
-        <div className="relative z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+        <div className="relative z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
+          {/* Direct Camera Capture Input */}
+          <input
+            type="file"
+            ref={cameraInputRef}
+            onChange={handlePhotosSelected}
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+          />
+
+          {/* Multi-photo Library Input */}
           <input
             type="file"
             ref={fileInputRef}
@@ -269,21 +282,33 @@ export function BarManager() {
           />
 
           <button
-            onClick={() => fileInputRef.current?.click()}
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
             disabled={scanning}
-            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-charcoal-950 font-bold text-sm shadow-lg transition-all cursor-pointer"
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-charcoal-950 font-bold text-xs sm:text-sm shadow-lg transition-all cursor-pointer"
           >
             <Camera className="w-4 h-4 text-charcoal-950" />
-            <span>Scan Bar Cart</span>
+            <span>Take Photo</span>
           </button>
 
           <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={scanning}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm backdrop-blur-md border border-white/20 shadow-md transition-all cursor-pointer"
+          >
+            <Upload className="w-4 h-4 text-amber-200" />
+            <span>Photo Library</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleSampleBar}
             disabled={scanning}
-            className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl bg-black/60 hover:bg-black/80 text-amber-300 font-medium text-xs backdrop-blur-md transition-all border border-amber-500/30 cursor-pointer shadow-md"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl bg-black/60 hover:bg-black/80 text-amber-300 font-medium text-xs backdrop-blur-md transition-all border border-amber-500/30 cursor-pointer shadow-md"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            <span>Sample Speakeasy</span>
+            <span>Sample Bar</span>
           </button>
         </div>
       </div>

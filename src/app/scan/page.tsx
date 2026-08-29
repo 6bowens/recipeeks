@@ -25,6 +25,7 @@ import { BudgetLimitModal } from '@/components/BudgetLimitModal';
 export default function ScanPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<'upload' | 'review' | 'indexing' | 'success'>('upload');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -264,7 +265,17 @@ export default function ScanPage() {
             </label>
           </div>
 
-          {/* Dropzone / Upload Area */}
+          {/* Mobile Camera Direct Capture Input */}
+          <input
+            type="file"
+            ref={cameraInputRef}
+            onChange={handleFileUpload}
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+          />
+
+          {/* Photo Library / File Picker Input */}
           <input
             type="file"
             ref={fileInputRef}
@@ -273,26 +284,39 @@ export default function ScanPage() {
             className="hidden"
           />
 
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-red-300 hover:border-red-500 bg-white hover:bg-red-50/30 rounded-3xl p-10 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-4 group shadow-sm"
-          >
+          <div className="border-2 border-dashed border-red-300 hover:border-red-500 bg-white hover:bg-red-50/30 rounded-3xl p-6 sm:p-10 text-center transition-all flex flex-col items-center justify-center gap-4 group shadow-sm">
             <div className="w-16 h-16 rounded-2xl bg-red-100 group-hover:bg-red-200 text-red-800 flex items-center justify-center transition-colors">
               <Camera className="w-8 h-8" />
             </div>
 
             <div>
               <h3 className="text-base font-bold text-charcoal-900">
-                Click to upload bookshelf photo or drag & drop
+                Snap or upload a photo of your bookshelf
               </h3>
               <p className="text-xs text-charcoal-500 mt-1">
-                Supports JPG, PNG, WEBP (Smartphone camera photos supported)
+                Direct camera capture on phone or upload JPG, PNG, WEBP from your gallery
               </p>
             </div>
 
-            <button className="px-5 py-2.5 bg-red-700 group-hover:bg-red-800 text-white font-semibold text-xs rounded-xl shadow-sm transition-colors">
-              Select Photo
-            </button>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto justify-center">
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="w-full sm:w-auto px-5 py-2.5 bg-red-700 hover:bg-red-800 active:bg-red-900 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Take Photo (Camera)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full sm:w-auto px-5 py-2.5 bg-charcoal-100 hover:bg-charcoal-200 active:bg-charcoal-300 text-charcoal-800 font-bold text-xs rounded-xl border border-charcoal-300 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Upload className="w-4 h-4 text-charcoal-600" />
+                <span>Photo Library</span>
+              </button>
+            </div>
           </div>
 
           {/* Sample Demo Button */}
