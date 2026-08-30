@@ -15,10 +15,12 @@ import {
   AlertTriangle,
   RotateCcw,
   Upload,
+  Building2,
 } from 'lucide-react';
 import { PantryItemData } from '@/types';
 import { isRecognizedBarStaple } from '@/lib/cocktail-utils';
 import { BudgetLimitModal } from '@/components/BudgetLimitModal';
+import { MenuScanModal } from '@/components/MenuScanModal';
 
 const POPULAR_BAR_ITEMS = [
   { name: 'Bourbon Whiskey', category: 'spirits' },
@@ -50,6 +52,7 @@ export function BarManager() {
   const [scanning, setScanning] = useState(false);
   const [uploadedPhotos, setUploadedPhotos] = useState<{ name: string; base64: string; type: string }[]>([]);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showMenuScanModal, setShowMenuScanModal] = useState(false);
   const [detectedItems, setDetectedItems] = useState<{ name: string; category: string; isAlwaysAvailable: boolean; selected: boolean }[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -310,6 +313,16 @@ export function BarManager() {
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
             <span>Sample Bar</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setShowMenuScanModal(true)}
+            className="flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl bg-gradient-to-r from-amber-600/30 to-amber-700/30 hover:from-amber-600/50 hover:to-amber-700/50 text-amber-200 hover:text-white font-bold text-xs backdrop-blur-md transition-all border border-amber-500/40 cursor-pointer shadow-md"
+            title="Scan a restaurant cocktail menu"
+          >
+            <Building2 className="w-3.5 h-3.5 text-amber-400" />
+            <span>Scan Menu</span>
+          </button>
         </div>
       </div>
 
@@ -553,6 +566,16 @@ export function BarManager() {
         currentSpend={budgetModal.currentSpend}
         spendLimit={budgetModal.spendLimit}
         message={budgetModal.message}
+      />
+
+      {/* Menu Scan Modal */}
+      <MenuScanModal
+        isOpen={showMenuScanModal}
+        onClose={() => setShowMenuScanModal(false)}
+        onMenuSaved={() => {
+          setStatusMessage('✓ Restaurant menu published globally!');
+          setTimeout(() => setStatusMessage(null), 3500);
+        }}
       />
     </div>
   );

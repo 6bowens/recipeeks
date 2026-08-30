@@ -19,9 +19,12 @@ import {
   Clock,
   Sparkle,
   Plus,
+  Camera,
+  Building2,
 } from 'lucide-react';
 import { CocktailRecommendationResult } from '@/app/api/cocktails/recommend/route';
 import { deduceBarCategory, isRecognizedBarStaple } from '@/lib/cocktail-utils';
+import { MenuScanModal } from '@/components/MenuScanModal';
 
 const SPIRIT_OPTIONS = [
   { id: 'Bourbon', label: 'Bourbon / Rye', icon: '🥃', desc: 'Warm oak, caramel & rye spice' },
@@ -115,8 +118,10 @@ export function DigitalBartender() {
   const [hasMore, setHasMore] = useState(true);
   const [addingIng, setAddingIng] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showMenuScanModal, setShowMenuScanModal] = useState(false);
   const [results, setResults] = useState<{
     libraryMatches: CocktailRecommendationResult[];
+    restaurantMatches?: CocktailRecommendationResult[];
     webClassicMatches: CocktailRecommendationResult[];
   } | null>(null);
 
@@ -251,6 +256,7 @@ export function DigitalBartender() {
 
         return {
           libraryMatches: updateList(prev.libraryMatches),
+          restaurantMatches: prev.restaurantMatches ? updateList(prev.restaurantMatches) : undefined,
           webClassicMatches: updateList(prev.webClassicMatches),
         };
       });
@@ -270,7 +276,7 @@ export function DigitalBartender() {
     setHasMore(true);
   };
 
-  const [resultFilter, setResultFilter] = useState<'all' | 'books' | 'digital'>('all');
+  const [resultFilter, setResultFilter] = useState<'all' | 'books' | 'restaurant' | 'digital'>('all');
 
   return (
     <div className="space-y-6">
@@ -290,12 +296,21 @@ export function DigitalBartender() {
             What are you in the mood to sip?
           </h2>
           <p className="text-xs sm:text-sm text-charcoal-400 max-w-2xl mt-1">
-            Answer 3 quick sensory questions to pair your craving with cocktails from your library and bar cart.
+            Answer 3 quick sensory questions to pair your craving with cocktails from your library, bar cart, and global restaurant menus.
           </p>
         </div>
 
-        {/* Step Indicator */}
-        <div className="relative z-10 shrink-0">
+        {/* Step Indicator & Actions */}
+        <div className="relative z-10 shrink-0 flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowMenuScanModal(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-600/40 to-amber-700/40 hover:from-amber-600/60 hover:to-amber-700/60 border border-amber-500/40 text-amber-200 hover:text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95"
+            title="Scan a restaurant cocktail menu to import drinks globally"
+          >
+            <Camera className="w-3.5 h-3.5 text-amber-400" />
+            <span>Scan Menu</span>
+          </button>
+
           {step < 4 ? (
             <div className="flex items-center gap-2 bg-[#0d0f14] border border-amber-900/40 px-3.5 py-2 rounded-2xl text-xs">
               <span className={step >= 1 ? 'text-amber-400 font-bold' : 'text-charcoal-500'}>1. Spirit</span>
@@ -307,7 +322,7 @@ export function DigitalBartender() {
           ) : (
             <button
               onClick={resetWizard}
-              className="px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl font-semibold text-xs flex items-center gap-2 backdrop-blur-md transition-all cursor-pointer shadow-md"
+              className="px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl font-semibold text-xs flex items-center gap-2 backdrop-blur-md transition-all cursor-pointer shadow-md"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Start Over</span>
@@ -516,7 +531,7 @@ export function DigitalBartender() {
                           : 'text-charcoal-400 hover:text-white'
                       }`}
                     >
-                      All ({(results.libraryMatches?.length || 0) + (results.webClassicMatches?.length || 0)})
+                      All ({(results.libraryMatches?.length || 0) + (results.restaurantMatches?.length || 0) + (results.webClassicMatches?.length || 0)})
                     </button>
                     <button
                       onClick={() => setResultFilter('books')}
@@ -527,6 +542,16 @@ export function DigitalBartender() {
                       }`}
                     >
                       📖 Books ({results.libraryMatches?.length || 0})
+                    </button>
+                    <button
+                      onClick={() => setResultFilter('restaurant')}
+                      className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                        resultFilter === 'restaurant'
+                          ? 'bg-amber-500 text-charcoal-950 shadow-sm'
+                          : 'text-charcoal-400 hover:text-white'
+                      }`}
+                    >
+                      🍸 Restaurant Menus ({results.restaurantMatches?.length || 0})
                     </button>
                     <button
                       onClick={() => setResultFilter('digital')}
@@ -566,6 +591,33 @@ export function DigitalBartender() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {results.libraryMatches.map((drink) => (
+                        <CocktailCard
+                          key={drink.id}
+                          cocktail={drink}
+                          onQuickAdd={handleQuickAddIngredient}
+                          addingIng={addingIng}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* STREAM 1.5: Global Restaurant Menu Cocktails */}
+              {(resultFilter === 'all' || resultFilter === 'restaurant') &&
+                results.restaurantMatches &&
+                results.restaurantMatches.length > 0 && (
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-rose-500/20 border border-rose-400/40 text-rose-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 font-mono">
+                        <Building2 className="w-3.5 h-3.5 text-rose-300" /> Restaurant & Speakeasy Menus
+                      </span>
+                      <span className="text-xs text-charcoal-400">
+                        {results.restaurantMatches.length} craft cocktail(s) from community-scanned restaurant menus
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {results.restaurantMatches.map((drink) => (
                         <CocktailCard
                           key={drink.id}
                           cocktail={drink}
@@ -628,6 +680,7 @@ export function DigitalBartender() {
                 )}
 
               {(!results.libraryMatches || results.libraryMatches.length === 0) &&
+                (!results.restaurantMatches || results.restaurantMatches.length === 0) &&
                 (!results.webClassicMatches || results.webClassicMatches.length === 0) && (
                   <div className="bg-[#12151b] rounded-2xl p-8 text-center border border-amber-900/30 shadow-xl">
                     <p className="text-sm font-semibold text-charcoal-200">
@@ -642,6 +695,17 @@ export function DigitalBartender() {
           ) : null}
         </div>
       )}
+
+      {/* Menu Scan Modal */}
+      <MenuScanModal
+        isOpen={showMenuScanModal}
+        onClose={() => setShowMenuScanModal(false)}
+        onMenuSaved={() => {
+          setToastMessage('✓ Restaurant menu published globally!');
+          setTimeout(() => setToastMessage(null), 3500);
+          handleGenerateRecommendations();
+        }}
+      />
     </div>
   );
 }
@@ -662,10 +726,14 @@ function CocktailCard({
       <div>
         {/* Header Badges: Dynamic Taste Profile & Spirit */}
         <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {cocktail.source === 'library' ? (
               <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
                 <BookOpen className="w-3 h-3 text-amber-300" /> {cocktail.bookTitle || 'Library'} {cocktail.pageNumber ? `· p. ${cocktail.pageNumber}` : ''}
+              </span>
+            ) : cocktail.source === 'restaurant_menu' ? (
+              <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1 font-mono">
+                <Building2 className="w-3 h-3 text-rose-400" /> {cocktail.restaurantName || 'Restaurant Menu'} {cocktail.restaurantCity ? `· ${cocktail.restaurantCity}` : ''}
               </span>
             ) : (
               <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">

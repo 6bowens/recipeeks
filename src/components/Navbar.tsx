@@ -23,6 +23,7 @@ import {
   BookMarked,
   UtensilsCrossed,
   History,
+  Building2,
 } from 'lucide-react';
 
 function NavbarContent() {
@@ -65,6 +66,12 @@ function NavbarContent() {
       tabId: 'bar_cart',
       label: 'Bar Cart & Bottles',
       icon: Wine,
+    },
+    {
+      href: '/cocktails?tab=menus',
+      tabId: 'menus',
+      label: 'Restaurant Menus',
+      icon: Building2,
     },
   ];
 

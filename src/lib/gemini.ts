@@ -875,4 +875,184 @@ Output Format: Return ONLY a valid JSON array of objects:
   }
 }
 
+export interface ExtractedMenuCocktail {
+  name: string;
+  menuDescription?: string;
+  spiritBase: string;
+  flavorProfile: 'sour' | 'boozy' | 'bitter' | 'highball' | 'tiki' | 'herbal' | 'dessert';
+  glassware: string;
+  ice: string;
+  technique: string;
+  garnish?: string;
+  ingredients: {
+    name: string;
+    amount?: string;
+    unit?: string;
+    optional?: boolean;
+  }[];
+  instructions: string[];
+}
+
+export interface ExtractedRestaurantMenuResult {
+  suggestedRestaurantName: string;
+  city?: string;
+  cocktails: ExtractedMenuCocktail[];
+}
+
+/**
+ * Scan a restaurant or cocktail bar menu photograph to extract drinks and estimate craft ratios
+ */
+export async function scanRestaurantCocktailMenu(
+  imageData: string | { base64Data: string; mimeType: string }[],
+  defaultMimeType: string = 'image/jpeg'
+): Promise<ExtractedRestaurantMenuResult> {
+  const genAI = getGeminiClient();
+
+  const images: { base64Data: string; mimeType: string }[] = [];
+  if (typeof imageData === 'string') {
+    if (imageData.trim()) {
+      images.push({
+        base64Data: imageData.replace(/^data:image\/[a-z]+;base64,/, ''),
+        mimeType: defaultMimeType,
+      });
+    }
+  } else if (Array.isArray(imageData)) {
+    imageData.forEach((img) => {
+      if (img?.base64Data) {
+        images.push({
+          base64Data: img.base64Data.replace(/^data:image\/[a-z]+;base64,/, ''),
+          mimeType: img.mimeType || 'image/jpeg',
+        });
+      }
+    });
+  }
+
+  if (!genAI || images.length === 0) {
+    return {
+      suggestedRestaurantName: 'The Violet Hour',
+      city: 'Chicago, IL',
+      cocktails: [
+        {
+          name: 'Juliet & Romeo',
+          menuDescription: 'Beefeater Gin, Mint, Cucumber, Lime, Rose Water, Angostura',
+          spiritBase: 'Gin',
+          flavorProfile: 'sour',
+          glassware: 'Coupe',
+          ice: 'Served Up',
+          technique: 'Shaken with cucumber & mint, double-strained',
+          garnish: '3 drops Angostura bitters on surface, cucumber wheel',
+          ingredients: [
+            { name: 'London Dry Gin', amount: '2', unit: 'oz' },
+            { name: 'Fresh Lime Juice', amount: '0.75', unit: 'oz' },
+            { name: 'Simple Syrup (1:1)', amount: '0.75', unit: 'oz' },
+            { name: 'Cucumber Slices', amount: '3', unit: 'slices' },
+            { name: 'Fresh Mint Leaves', amount: '6', unit: 'leaves' },
+            { name: 'Rose Water', amount: '3', unit: 'drops', optional: true },
+            { name: 'Angostura Bitters', amount: '3', unit: 'drops' },
+          ],
+          instructions: [
+            'In a cocktail shaker, gently muddle the cucumber slices and fresh mint with simple syrup.',
+            'Add gin and freshly squeezed lime juice. Fill shaker with ice cubes.',
+            'Shake vigorously for 12-15 seconds until thoroughly chilled and aerated.',
+            'Double strain through a fine-mesh sieve into a chilled coupe glass.',
+            'Garnish with 3 drops of Angostura bitters and 3 drops of rose water on the surface froth.',
+          ],
+        },
+      ],
+    };
+  }
+
+  const prompt = `
+You are a master craft cocktail mixologist and world-class culinary OCR vision AI.
+Analyze the photograph(s) of this restaurant, cocktail bar, speakeasy, or lounge cocktail menu.
+
+Exhaustive Task Requirements:
+1. RESTAURANT IDENTIFICATION:
+   - Identify the Restaurant / Bar Name if printed on the menu header, footer, logo, or cover (e.g. "Death & Co", "The Dead Rabbit", "Attaboy", "Bemelmans Bar", "Dante").
+   - If not clearly discernible, suggest a clean descriptive fallback (e.g. "Speakeasy Cocktail Bar").
+   - Extract city/neighborhood if indicated.
+
+2. COCKTAIL EXTRACTION:
+   - Extract EVERY SINGLE cocktail / mixed drink listed on the menu.
+   - Capture the exact printed drink title as "name".
+   - Capture the verbatim listed ingredients / description text printed under the drink as "menuDescription".
+
+3. CRAFT RATIO ESTIMATION & MIXOLOGY SYNTHESIS:
+   - Menus usually only list ingredients (e.g., "Mezcal, Passionfruit, Lime, Habanero, Agave, Black Salt Rim") without exact fluid ounce quantities.
+   - As a master bartender, synthesize standard balanced craft cocktail ratios based on classic cocktail templates and web recipe specs:
+     * Sours / Margaritas / Daiquiris: Typically 2 oz spirit + 0.75-1 oz citrus/acid + 0.75 oz sweetener/liqueur.
+     * Spirit-Forward (Manhattan / Old Fashioned / Martini): Typically 2-2.5 oz spirit + 0.75-1 oz vermouth/amaro/modifier + 2-3 dashes bitters.
+     * Equal Parts (Negroni / Last Word / Paper Plane / Corpse Reviver): Typically 0.75 oz to 1 oz each ingredient.
+     * Highballs & Fizzes: 1.5-2 oz base + 0.5-0.75 oz citrus/syrup + 3-4 oz effervescent topper (club soda/tonic/ginger beer).
+     * Tiki / Tropical: Layered 2 oz rums/spirits + 0.75 oz lime/grapefruit + 0.5 oz orgeat/falernum/passionfruit.
+   - Determine appropriate:
+     * "spiritBase": One of "Bourbon / Rye", "Gin", "Tequila / Mezcal", "Rum", "Vodka", "Brandy", "Amaro / Spritz", "Other"
+     * "flavorProfile": One of "sour", "boozy", "bitter", "highball", "tiki", "herbal", "dessert"
+     * "glassware": "Coupe", "Rocks Glass", "Highball Glass", "Nick & Nora", "Martini Glass", "Tiki Mug", "Collins Glass"
+     * "ice": "Large Cube", "Crushed Ice", "Served Up", "Neat", "Cubed Ice"
+     * "technique": "Shaken", "Stirred", "Built over Ice", "Swizzled", "Blended"
+     * "garnish": Specific classic or craft garnish
+     * "ingredients": Array of structured ingredients with normalized names, amounts (e.g. "2", "0.75", "0.5", "2"), and units ("oz", "dashes", "barspoon", "leaves", "drops")
+     * "instructions": 3 to 5 clear step-by-step professional bartending instructions.
+
+Output format: Return ONLY a valid JSON object:
+{
+  "suggestedRestaurantName": "Bar Name",
+  "city": "City, State or Country (optional)",
+  "cocktails": [
+    {
+      "name": "Cocktail Name",
+      "menuDescription": "Raw menu description",
+      "spiritBase": "Tequila / Mezcal",
+      "flavorProfile": "sour",
+      "glassware": "Rocks Glass",
+      "ice": "Large Cube",
+      "technique": "Shaken",
+      "garnish": "Dehydrated lime wheel & chili salt rim",
+      "ingredients": [
+        { "name": "Mezcal Espadin", "amount": "1.5", "unit": "oz", "optional": false },
+        { "name": "Blanco Tequila", "amount": "0.5", "unit": "oz", "optional": false },
+        { "name": "Fresh Lime Juice", "amount": "0.75", "unit": "oz", "optional": false },
+        { "name": "Agave Syrup (1:1)", "amount": "0.5", "unit": "oz", "optional": false },
+        { "name": "Ancho Reyes Chili Liqueur", "amount": "0.5", "unit": "oz", "optional": false }
+      ],
+      "instructions": [
+        "Rim half of a rocks glass with chili-lime salt.",
+        "Add mezcal, tequila, fresh lime juice, agave syrup, and Ancho Reyes to a cocktail shaker with ice.",
+        "Shake vigorously for 12 seconds until thoroughly chilled.",
+        "Strain over a fresh large clear ice cube in the prepared rocks glass.",
+        "Garnish with a dehydrated lime wheel."
+      ]
+    }
+  ]
+}
+`;
+
+  const imageParts = images.map((img) => ({
+    inlineData: {
+      data: img.base64Data,
+      mimeType: img.mimeType,
+    },
+  }));
+
+  try {
+    const responseText = await generateWithFallback(genAI, [prompt, ...imageParts], {
+      responseMimeType: 'application/json',
+      temperature: 0.2,
+    });
+    const parsed = JSON.parse(responseText);
+    const result: ExtractedRestaurantMenuResult = {
+      suggestedRestaurantName: parsed.suggestedRestaurantName ? String(parsed.suggestedRestaurantName).trim() : 'Craft Cocktail Bar',
+      city: parsed.city ? String(parsed.city).trim() : undefined,
+      cocktails: Array.isArray(parsed.cocktails) ? parsed.cocktails : [],
+    };
+
+    return result;
+  } catch (error) {
+    console.error('Error scanning restaurant cocktail menu:', error);
+    throw new Error('Failed to analyze restaurant cocktail menu: ' + (error as Error).message);
+  }
+}
+
+
 

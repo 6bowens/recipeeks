@@ -10,10 +10,13 @@ export const dynamic = 'force-dynamic';
 export interface CocktailRecommendationResult {
   id: string;
   name: string;
-  source: 'library' | 'web_classic';
+  source: 'library' | 'web_classic' | 'restaurant_menu';
   bookTitle?: string;
   bookCover?: string | null;
   pageNumber?: number | null;
+  restaurantName?: string;
+  restaurantCity?: string | null;
+  menuDescription?: string | null;
   spiritBase: string;
   flavorProfile: string;
   flavorProfiles?: string[];
@@ -151,7 +154,82 @@ export async function POST(req: Request) {
     // Sort Tier 1 matches by highest match score
     libraryMatches.sort((a, b) => b.matchScore - a.matchScore);
 
-    // 3. TIER 2: Curated Classic & Modern Web Specs strictly aligned with survey inputs
+    // 2.5 TIER: Global Restaurant Menu Cocktails
+    const globalRestaurantCocktails = await db.restaurantCocktail.findMany({
+      include: {
+        menu: true,
+        ingredients: true,
+      },
+    });
+
+    const restaurantMatches: CocktailRecommendationResult[] = [];
+    for (const rc of globalRestaurantCocktails) {
+      if (!rc.ingredients || rc.ingredients.length === 0) continue;
+
+      const matched: string[] = [];
+      const missing: string[] = [];
+      const ingredientsList = rc.ingredients.map((ing) => {
+        const stocked = isIngredientInInventory(ing.name) || ing.optional;
+        if (stocked) {
+          matched.push(ing.name);
+        } else {
+          missing.push(ing.name);
+        }
+        return {
+          name: ing.name,
+          amount: ing.amount || undefined,
+          unit: ing.unit || undefined,
+          isStocked: stocked,
+        };
+      });
+
+      const score = Math.round((matched.length / rc.ingredients.length) * 100);
+
+      let matchesSpirit = true;
+      if (spiritBase && spiritBase !== 'Any') {
+        const spiritNorm = spiritBase.toLowerCase();
+        matchesSpirit =
+          (rc.spiritBase ? rc.spiritBase.toLowerCase().includes(spiritNorm) : false) ||
+          rc.ingredients.some((i) => i.name.toLowerCase().includes(spiritNorm)) ||
+          rc.name.toLowerCase().includes(spiritNorm);
+      }
+
+      let instructionsArray: string[] = [];
+      try {
+        if (rc.instructions) {
+          instructionsArray = JSON.parse(rc.instructions);
+        }
+      } catch (e) {
+        instructionsArray = rc.instructions ? [rc.instructions] : [];
+      }
+
+      if (matchesSpirit) {
+        restaurantMatches.push({
+          id: `rest-${rc.id}`,
+          name: rc.name,
+          source: 'restaurant_menu',
+          restaurantName: rc.menu.restaurantName,
+          restaurantCity: rc.menu.city,
+          menuDescription: rc.menuDescription,
+          spiritBase: rc.spiritBase || 'Craft Mix',
+          flavorProfile: rc.flavorProfile || 'Balanced',
+          glassware: rc.glassware || 'Coupe',
+          ice: rc.ice || 'Served Up',
+          technique: rc.technique || 'Shaken',
+          garnish: rc.garnish || undefined,
+          matchScore: score,
+          ingredients: ingredientsList,
+          matchedIngredients: matched,
+          missingIngredients: missing,
+          instructions: instructionsArray,
+          description: `From ${rc.menu.restaurantName} cocktail menu${rc.menu.city ? ` (${rc.menu.city})` : ''}`,
+        });
+      }
+    }
+
+    restaurantMatches.sort((a, b) => b.matchScore - a.matchScore);
+
+    // 3. TIER 3: Curated Classic & Modern Web Specs strictly aligned with survey inputs
     const targetSpirit = (spiritBase && spiritBase !== 'Any') ? spiritBase.toLowerCase() : null;
     const targetFlavor = (flavorProfile && flavorProfile !== 'Any') ? flavorProfile.toLowerCase() : null;
     const targetComplexity = (complexity && complexity !== 'Any') ? complexity.toLowerCase() : null;
@@ -295,11 +373,13 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       libraryCount: libraryMatches.length,
+      restaurantCount: restaurantMatches.length,
       webCount: paginatedWebMatches.length,
       totalWebAvailable: uniqueWebMatches.length,
       hasMore: true, // Always keep reappearing indefinitely
       recommendations: {
         libraryMatches,
+        restaurantMatches,
         webClassicMatches: paginatedWebMatches,
       },
     });

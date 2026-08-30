@@ -27,6 +27,7 @@ model User {
   customRecipes      CustomRecipe[]
   mealPlaylists      MealPlaylist[]
   mealHistory        MealHistory[]
+  restaurantMenus    RestaurantMenu[]
 }
 
 model AiUsageLog {
@@ -192,4 +193,55 @@ model MealHistory {
 
   @@index([userId])
   @@index([cookedAt])
+}
+
+model RestaurantMenu {
+  id             String               @id @default(cuid())
+  restaurantName String
+  city           String?
+  notes          String?
+  imageUrl       String?
+  userId         String?              // Contributed by user
+  user           User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  cocktails      RestaurantCocktail[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([restaurantName])
+  @@index([userId])
+}
+
+model RestaurantCocktail {
+  id              String                         @id @default(cuid())
+  name            String
+  menuDescription String?                        // Raw menu ingredients/description
+  spiritBase      String?                        // "Bourbon / Rye", "Gin", "Tequila / Mezcal", "Rum", "Vodka", "Other"
+  flavorProfile   String?                        // "sour", "bitter", "boozy", "tiki", "herbal", "highball", "dessert"
+  glassware       String?                        // "Coupe", "Rocks", "Highball", "Nick & Nora", "Martini", etc.
+  ice             String?                        // "Large Cube", "Crushed", "Neat", "Up", "Cubed"
+  technique       String?                        // "Shaken", "Stirred", "Built"
+  garnish         String?
+  instructions    String?                        // JSON array string of steps
+  menuId          String
+  menu            RestaurantMenu                 @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  ingredients     RestaurantCocktailIngredient[]
+  createdAt       DateTime                       @default(now())
+  updatedAt       DateTime                       @updatedAt
+
+  @@index([menuId])
+  @@index([name])
+}
+
+model RestaurantCocktailIngredient {
+  id             String             @id @default(cuid())
+  name           String
+  normalizedName String
+  amount         String?            // "2", "0.75", "2 dashes"
+  unit           String?            // "oz", "dashes", "tsp", "ml", "splash"
+  optional       Boolean            @default(false)
+  cocktailId     String
+  cocktail       RestaurantCocktail @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
+
+  @@index([cocktailId])
+  @@index([normalizedName])
 }
