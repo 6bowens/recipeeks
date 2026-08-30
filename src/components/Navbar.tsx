@@ -70,7 +70,7 @@ function NavbarContent() {
     {
       href: '/cocktails?tab=menus',
       tabId: 'menus',
-      label: 'Restaurant Menus',
+      label: 'Restaurant Cocktails',
       icon: Building2,
     },
   ];

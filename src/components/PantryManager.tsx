@@ -248,44 +248,6 @@ export function PantryManager() {
     }
   };
 
-  const handleSampleFridge = async () => {
-    try {
-      setScanning(true);
-      const scanRes = await fetch('/api/ai/scan-pantry', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ useDemoSample: true }),
-      });
-      const scanData = await scanRes.json();
-      if (!scanRes.ok) {
-        if (scanData.error === 'AI_SPEND_LIMIT_EXCEEDED' || scanRes.status === 429) {
-          setBudgetModal({
-            isOpen: true,
-            message: scanData.message,
-            currentSpend: scanData.currentSpend,
-            spendLimit: scanData.spendLimit,
-          });
-          return;
-        }
-        throw new Error(scanData.error || 'Failed to load sample');
-      }
-
-      if (scanData?.items) {
-        setDetectedReviewItems(
-          scanData.items.map((item: any) => ({
-            ...item,
-            selected: true,
-          }))
-        );
-        setShowReviewModal(true);
-      }
-    } catch (e) {
-      alert('Error loading sample fridge: ' + (e as Error).message);
-    } finally {
-      setScanning(false);
-    }
-  };
-
   // Save selected items from Review Modal
   const handleSaveReviewedItems = async () => {
     const selected = detectedReviewItems.filter((i) => i.selected);
@@ -443,16 +405,6 @@ export function PantryManager() {
           >
             <Upload className="w-4 h-4 text-rose-200" />
             <span>Library</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSampleFridge}
-            disabled={scanning}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl bg-black/30 hover:bg-black/40 text-rose-100 font-medium text-xs backdrop-blur-md transition-all cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-rose-300" />
-            <span>Sample Fridge</span>
           </button>
         </div>
       </div>

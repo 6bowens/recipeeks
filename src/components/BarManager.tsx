@@ -162,31 +162,6 @@ export function BarManager() {
     }
   };
 
-  const handleSampleBar = async () => {
-    try {
-      setScanning(true);
-      const res = await fetch('/api/ai/scan-bar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ useDemoSample: true }),
-      });
-      const data = await res.json();
-      if (data?.items) {
-        setDetectedItems(
-          data.items.map((i: any) => ({
-            ...i,
-            selected: true,
-          }))
-        );
-        setShowReviewModal(true);
-      }
-    } catch (e) {
-      alert('Error loading sample: ' + (e as Error).message);
-    } finally {
-      setScanning(false);
-    }
-  };
-
   const handleSaveReviewed = async () => {
     const selected = detectedItems.filter((i) => i.selected);
     if (selected.length === 0) return;
@@ -302,16 +277,6 @@ export function BarManager() {
           >
             <Upload className="w-4 h-4 text-amber-200" />
             <span>Photo Library</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSampleBar}
-            disabled={scanning}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl bg-black/60 hover:bg-black/80 text-amber-300 font-medium text-xs backdrop-blur-md transition-all border border-amber-500/30 cursor-pointer shadow-md"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            <span>Sample Bar</span>
           </button>
 
           <button

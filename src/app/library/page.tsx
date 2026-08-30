@@ -183,7 +183,7 @@ export default function LibraryPage() {
           <p className="text-xs text-charcoal-500 max-w-sm mx-auto">
             {searchQuery
               ? 'Try searching with a different keyword or author name.'
-              : 'Scan your bookshelf or try sample test cookbooks to start indexing recipes.'}
+              : 'Scan your bookshelf to start indexing your cookbooks and recipes.'}
           </p>
           <Link
             href="/scan"

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import {
   Sparkles,
   Wine,
@@ -302,6 +303,15 @@ export function DigitalBartender() {
 
         {/* Step Indicator & Actions */}
         <div className="relative z-10 shrink-0 flex items-center gap-2 flex-wrap">
+          <Link
+            href="/cocktails?tab=menus"
+            className="px-3.5 py-2 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-200 hover:text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+            title="Browse all imported restaurant cocktails"
+          >
+            <Building2 className="w-3.5 h-3.5 text-rose-400" />
+            <span>Restaurant Cocktails</span>
+          </Link>
+
           <button
             onClick={() => setShowMenuScanModal(true)}
             className="px-3.5 py-2 bg-gradient-to-r from-amber-600/40 to-amber-700/40 hover:from-amber-600/60 hover:to-amber-700/60 border border-amber-500/40 text-amber-200 hover:text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95"

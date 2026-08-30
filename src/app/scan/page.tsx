@@ -63,12 +63,7 @@ export default function ScanPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleUseDemoSample = () => {
-    setImagePreview(null);
-    runBookshelfScan('', 'image/jpeg', true);
-  };
-
-  const runBookshelfScan = async (imageBase64: string, mimeType: string, useDemoSample: boolean = false) => {
+  const runBookshelfScan = async (imageBase64: string, mimeType: string) => {
     try {
       setIsScanning(true);
       const res = await fetch('/api/ai/scan-bookshelf', {
@@ -79,7 +74,6 @@ export default function ScanPage() {
           mimeType,
           skipCocktails,
           limitFirstOnly,
-          useDemoSample,
         }),
       });
 
@@ -317,19 +311,6 @@ export default function ScanPage() {
                 <span>Photo Library</span>
               </button>
             </div>
-          </div>
-
-          {/* Sample Demo Button */}
-          <div className="text-center pt-2">
-            <span className="text-xs text-charcoal-400 block mb-2">— Or explore with test data —</span>
-            <button
-              onClick={handleUseDemoSample}
-              disabled={isScanning}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-charcoal-800 text-white text-xs font-semibold hover:bg-charcoal-900 transition-colors shadow-sm"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-rose-300" />
-              {isScanning ? 'Analyzing Spines...' : 'Use Sample Bookshelf Photo'}
-            </button>
           </div>
         </div>
       )}

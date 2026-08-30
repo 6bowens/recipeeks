@@ -131,28 +131,6 @@ export function ReceiptScannerModal({
     }
   };
 
-  const handleUseDemoSample = async () => {
-    try {
-      setIsScanning(true);
-      const res = await fetch('/api/ai/scan-receipt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ useDemo: true }),
-      });
-      const data = await res.json();
-      const items: DetectedReceiptItem[] = (data.items || []).map((it: any) => ({
-        ...it,
-        selected: true,
-      }));
-      setDetectedItems(items);
-      setStep('review');
-    } catch (err) {
-      alert((err as Error).message);
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
   const toggleSelectItem = (index: number) => {
     setDetectedItems((prev) =>
       prev.map((it, idx) => (idx === index ? { ...it, selected: !it.selected } : it))
@@ -320,18 +298,6 @@ export function ReceiptScannerModal({
                       >
                         <Upload className="w-4 h-4 text-purple-400" />
                         <span>Photo Library</span>
-                      </button>
-                    </div>
-
-                    <div className="pt-2">
-                      <span className="text-[11px] text-purple-300/50 block mb-2">— Or try with sample data —</span>
-                      <button
-                        type="button"
-                        onClick={handleUseDemoSample}
-                        className="px-4 py-2 bg-purple-950/80 hover:bg-purple-900/80 text-purple-300 text-xs font-semibold rounded-xl border border-purple-800/50 transition-all flex items-center gap-1.5 cursor-pointer mx-auto"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                        <span>Load Sample Grocery Receipt</span>
                       </button>
                     </div>
                   </div>
