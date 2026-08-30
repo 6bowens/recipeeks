@@ -93,6 +93,9 @@ export async function POST(req: Request) {
       const coverColor = generateCoverColor(book.title);
       const coverImageUrl = await fetchRealBookCover(book.title, book.author);
 
+      // Pacing delay to stay well under Gemini rate limits in large batches
+      await new Promise((r) => setTimeout(r, 1200));
+
       // Create Cookbook record in DB
       const cookbook = await db.cookbook.create({
         data: {

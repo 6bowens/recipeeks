@@ -14,13 +14,13 @@ export const MODEL_CANDIDATES = Array.from(
   new Set(
     [
       process.env.GEMINI_MODEL,
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
-      'gemini-1.5-flash-latest',
-      'gemini-1.5-flash-8b',
-      'gemini-1.5-pro',
-      'gemini-2.0-flash-exp',
-      'gemini-pro',
+      'gemini-2.5-flash',
+      'gemini-3.6-flash',
+      'gemini-2.5-pro',
+      'gemini-3.7-flash',
+      'gemini-flash-latest',
+      'gemini-pro-latest',
+      'gemini-2.5-flash-lite',
     ].filter(Boolean) as string[]
   )
 );
@@ -33,23 +33,55 @@ export async function generateWithFallback(
   let lastError: any = null;
 
   for (const modelName of MODEL_CANDIDATES) {
-    try {
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        generationConfig: config,
-      });
-      const result = await model.generateContent(promptParts);
-      return result.response.text();
-    } catch (err: any) {
-      lastError = err;
-      const errMsg = (err?.message || '').toLowerCase();
-      // If 404 model not found or deprecated, try next candidate
-      if (errMsg.includes('not found') || errMsg.includes('no longer available') || errMsg.includes('404') || errMsg.includes('is not supported')) {
-        console.warn(`Model ${modelName} not available, attempting next candidate...`);
-        continue;
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      attempts++;
+      try {
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: config,
+        });
+        const result = await model.generateContent(promptParts);
+        return result.response.text();
+      } catch (err: any) {
+        lastError = err;
+        const errMsg = (err?.message || '').toLowerCase();
+        
+        // If 429 rate limit or quota or 503 overloaded, wait with exponential backoff and retry
+        if (
+          errMsg.includes('429') ||
+          errMsg.includes('resource_exhausted') ||
+          errMsg.includes('too many requests') ||
+          errMsg.includes('quota') ||
+          errMsg.includes('503') ||
+          errMsg.includes('service unavailable') ||
+          errMsg.includes('overloaded')
+        ) {
+          console.warn(`[Gemini] Model ${modelName} rate limited / busy (attempt ${attempts}/${maxAttempts}). Waiting before retry...`);
+          await new Promise((resolve) => setTimeout(resolve, attempts * 2500));
+          continue;
+        }
+
+        // If 404 model not found or deprecated, break to next candidate model
+        if (
+          errMsg.includes('not found') ||
+          errMsg.includes('no longer available') ||
+          errMsg.includes('404') ||
+          errMsg.includes('is not supported')
+        ) {
+          console.warn(`[Gemini] Model ${modelName} not available, attempting next candidate...`);
+          break;
+        }
+
+        // If other error and we have retries left, wait briefly
+        if (attempts < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          continue;
+        }
+        break;
       }
-      // If other error, rethrow
-      throw err;
     }
   }
 
@@ -178,7 +210,7 @@ You are an authoritative culinary database and recipe indexer.
 For the cookbook "${title}"${author ? ` by ${author}` : ''}, provide a rich, detailed index of recipes contained within the book.
 
 Requirements:
-1. Provide ${sampleOnly ? '5-8 prominent recipes' : '15-25 of the most famous and distinctive recipes'} from this exact cookbook.
+1. Provide ${sampleOnly ? '6-10 prominent recipes' : '20-35 of the most famous and distinctive recipes'} from this exact cookbook across all sections (mains, sides, desserts, soups, salads, sauces).
 2. For each recipe, provide:
    - "title": Exact or known recipe name in the book
    - "pageNumber": Realistic or known page number in standard print editions
@@ -217,7 +249,9 @@ Output format: Return ONLY a valid JSON array of recipe objects:
       temperature: 0.3,
     });
     const parsed = JSON.parse(text);
-    return Array.isArray(parsed) ? parsed : [parsed];
+    const results = Array.isArray(parsed) ? parsed : [parsed];
+    if (results.length > 0) return results;
+    return getCuratedMockRecipes(title);
   } catch (error) {
     console.error('Error in indexCookbookRecipes:', error);
     return getCuratedMockRecipes(title);
