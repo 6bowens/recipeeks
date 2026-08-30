@@ -48,7 +48,8 @@ export async function POST(req: Request) {
 
     const userId = session.user.id;
     const body = await req.json();
-    const { spiritBase, flavorProfile, complexity, limit = 6, offset = 0 } = body;
+    const { spiritBase, flavorProfile, complexity, searchQuery, query, limit = 6, offset = 0 } = body;
+    const searchTerm = (searchQuery || query || '').trim().toLowerCase();
 
     // 1. Fetch user's entire inventory (both pantry & bar items)
     const userInventory = await db.pantryItem.findMany({
@@ -72,7 +73,9 @@ export async function POST(req: Request) {
       });
     };
 
-    // 2. TIER 1: Search Physical Books in User's Library
+    // =========================================================================
+    // 1) FIRST PRIORITY: Physical Recipe Books in User's Library
+    // =========================================================================
     const cocktailBooks = await db.cookbook.findMany({
       where: {
         userId,
@@ -97,6 +100,16 @@ export async function POST(req: Request) {
       for (const recipe of book.recipes) {
         if (!recipe.ingredients || recipe.ingredients.length === 0) continue;
 
+        // If search term is provided, filter by recipe title, book title, or ingredients
+        if (searchTerm) {
+          const titleMatch = recipe.title.toLowerCase().includes(searchTerm);
+          const bookMatch = book.title.toLowerCase().includes(searchTerm);
+          const ingMatch = recipe.ingredients.some((i) => i.name.toLowerCase().includes(searchTerm));
+          if (!titleMatch && !bookMatch && !ingMatch) {
+            continue;
+          }
+        }
+
         const matched: string[] = [];
         const missing: string[] = [];
         const ingredientsList = recipe.ingredients.map((ing) => {
@@ -120,9 +133,9 @@ export async function POST(req: Request) {
         let matchesSpirit = true;
         if (spiritBase && spiritBase !== 'Any') {
           const spiritNorm = spiritBase.toLowerCase();
-          matchesSpirit = recipe.ingredients.some((i) =>
-            i.name.toLowerCase().includes(spiritNorm)
-          ) || recipe.title.toLowerCase().includes(spiritNorm);
+          matchesSpirit =
+            recipe.ingredients.some((i) => i.name.toLowerCase().includes(spiritNorm)) ||
+            recipe.title.toLowerCase().includes(spiritNorm);
         }
 
         if (matchesSpirit) {
@@ -151,10 +164,20 @@ export async function POST(req: Request) {
       }
     }
 
-    // Sort Tier 1 matches by highest match score
-    libraryMatches.sort((a, b) => b.matchScore - a.matchScore);
+    // Sort Tier 1 (Recipe Books): Exact name matches first, then highest inventory score
+    libraryMatches.sort((a, b) => {
+      if (searchTerm) {
+        const aExact = a.name.toLowerCase() === searchTerm;
+        const bExact = b.name.toLowerCase() === searchTerm;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+      }
+      return b.matchScore - a.matchScore;
+    });
 
-    // 2.5 TIER: Global Restaurant Menu Cocktails
+    // =========================================================================
+    // 2) SECOND PRIORITY: Global Restaurant & Speakeasy Cocktails
+    // =========================================================================
     const globalRestaurantCocktails = await db.restaurantCocktail.findMany({
       include: {
         menu: true,
@@ -165,6 +188,18 @@ export async function POST(req: Request) {
     const restaurantMatches: CocktailRecommendationResult[] = [];
     for (const rc of globalRestaurantCocktails) {
       if (!rc.ingredients || rc.ingredients.length === 0) continue;
+
+      // If search term is provided, filter by cocktail name, restaurant name, city, notes, or ingredients
+      if (searchTerm) {
+        const nameMatch = rc.name.toLowerCase().includes(searchTerm);
+        const restMatch = rc.menu.restaurantName.toLowerCase().includes(searchTerm);
+        const cityMatch = rc.menu.city ? rc.menu.city.toLowerCase().includes(searchTerm) : false;
+        const descMatch = rc.menuDescription ? rc.menuDescription.toLowerCase().includes(searchTerm) : false;
+        const ingMatch = rc.ingredients.some((i) => i.name.toLowerCase().includes(searchTerm));
+        if (!nameMatch && !restMatch && !cityMatch && !descMatch && !ingMatch) {
+          continue;
+        }
+      }
 
       const matched: string[] = [];
       const missing: string[] = [];
@@ -227,9 +262,20 @@ export async function POST(req: Request) {
       }
     }
 
-    restaurantMatches.sort((a, b) => b.matchScore - a.matchScore);
+    // Sort Tier 2 (Restaurant Cocktails): Exact name matches first, then highest inventory score
+    restaurantMatches.sort((a, b) => {
+      if (searchTerm) {
+        const aExact = a.name.toLowerCase() === searchTerm;
+        const bExact = b.name.toLowerCase() === searchTerm;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+      }
+      return b.matchScore - a.matchScore;
+    });
 
-    // 3. TIER 3: Curated Classic & Modern Web Specs strictly aligned with survey inputs
+    // =========================================================================
+    // 3) THIRD PRIORITY: Curated Web & Classic Recipes
+    // =========================================================================
     const targetSpirit = (spiritBase && spiritBase !== 'Any') ? spiritBase.toLowerCase() : null;
     const targetFlavor = (flavorProfile && flavorProfile !== 'Any') ? flavorProfile.toLowerCase() : null;
     const targetComplexity = (complexity && complexity !== 'Any') ? complexity.toLowerCase() : null;
@@ -295,52 +341,75 @@ export async function POST(req: Request) {
       return classic.complexity.toLowerCase() === targetComplexity;
     };
 
-    // STRICT FLAVOR FILTERING:
-    // If targetFlavor is requested, we MUST only return cocktails matching that flavor profile!
-    const exactMatches: ClassicCocktailSpec[] = [];
-    const flavorMatchesSameSpirit: ClassicCocktailSpec[] = [];
-    const flavorMatchesOtherSpirits: ClassicCocktailSpec[] = [];
-
-    const seenIds = new Set<string>();
-
-    for (const classic of CLASSIC_COCKTAILS) {
-      if (matchesFlavor(classic)) {
-        if (matchesSpiritBase(classic)) {
-          if (matchesComplexity(classic)) {
-            exactMatches.push(classic);
-            seenIds.add(classic.id);
-          } else {
-            flavorMatchesSameSpirit.push(classic);
-            seenIds.add(classic.id);
-          }
-        } else {
-          flavorMatchesOtherSpirits.push(classic);
-          seenIds.add(classic.id);
-        }
-      }
-    }
-
-    const formatAndSort = (specs: ClassicCocktailSpec[]) => {
-      return specs.map(formatClassic).sort((a, b) => b.matchScore - a.matchScore);
+    const matchesSearch = (classic: ClassicCocktailSpec) => {
+      if (!searchTerm) return true;
+      return (
+        classic.name.toLowerCase().includes(searchTerm) ||
+        (classic.description ? classic.description.toLowerCase().includes(searchTerm) : false) ||
+        classic.spiritBase.toLowerCase().includes(searchTerm) ||
+        classic.flavorProfiles.some((f) => f.toLowerCase().includes(searchTerm)) ||
+        classic.ingredients.some((i) => i.name.toLowerCase().includes(searchTerm))
+      );
     };
 
-    const sortedExact = formatAndSort(exactMatches);
-    const sortedFlavorSameSpirit = formatAndSort(flavorMatchesSameSpirit);
-    const sortedFlavorOtherSpirits = formatAndSort(flavorMatchesOtherSpirits);
+    // If search term is specified, search across all classic web recipes
+    let combinedWebMatches: CocktailRecommendationResult[] = [];
 
-    // Combine in strict order:
-    // 1. Same spirit + target flavor + target complexity
-    // 2. Same spirit + target flavor
-    // 3. Other spirits with the EXACT target flavor (if the user clicks load more repeatedly)
-    let combinedWebMatches: CocktailRecommendationResult[] = [
-      ...sortedExact,
-      ...sortedFlavorSameSpirit,
-      ...sortedFlavorOtherSpirits,
-    ];
+    if (searchTerm) {
+      const filtered = CLASSIC_COCKTAILS.filter(matchesSearch).filter(matchesSpiritBase);
+      const formatted = filtered.map(formatClassic);
+      formatted.sort((a, b) => {
+        const aExact = a.name.toLowerCase() === searchTerm;
+        const bExact = b.name.toLowerCase() === searchTerm;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        return b.matchScore - a.matchScore;
+      });
+      combinedWebMatches = formatted;
+    } else {
+      // STRICT FLAVOR FILTERING:
+      // If targetFlavor is requested, we MUST only return cocktails matching that flavor profile!
+      const exactMatches: ClassicCocktailSpec[] = [];
+      const flavorMatchesSameSpirit: ClassicCocktailSpec[] = [];
+      const flavorMatchesOtherSpirits: ClassicCocktailSpec[] = [];
 
-    // Fallback only if no drinks in the entire database match the flavor (should not happen with our catalog)
-    if (combinedWebMatches.length === 0) {
-      combinedWebMatches = CLASSIC_COCKTAILS.filter(matchesSpiritBase).map(formatClassic);
+      const seenIds = new Set<string>();
+
+      for (const classic of CLASSIC_COCKTAILS) {
+        if (matchesFlavor(classic)) {
+          if (matchesSpiritBase(classic)) {
+            if (matchesComplexity(classic)) {
+              exactMatches.push(classic);
+              seenIds.add(classic.id);
+            } else {
+              flavorMatchesSameSpirit.push(classic);
+              seenIds.add(classic.id);
+            }
+          } else {
+            flavorMatchesOtherSpirits.push(classic);
+            seenIds.add(classic.id);
+          }
+        }
+      }
+
+      const formatAndSort = (specs: ClassicCocktailSpec[]) => {
+        return specs.map(formatClassic).sort((a, b) => b.matchScore - a.matchScore);
+      };
+
+      const sortedExact = formatAndSort(exactMatches);
+      const sortedFlavorSameSpirit = formatAndSort(flavorMatchesSameSpirit);
+      const sortedFlavorOtherSpirits = formatAndSort(flavorMatchesOtherSpirits);
+
+      combinedWebMatches = [
+        ...sortedExact,
+        ...sortedFlavorSameSpirit,
+        ...sortedFlavorOtherSpirits,
+      ];
+
+      // Fallback only if no drinks in the entire database match the flavor
+      if (combinedWebMatches.length === 0) {
+        combinedWebMatches = CLASSIC_COCKTAILS.filter(matchesSpiritBase).map(formatClassic);
+      }
     }
 
     // Deduplicate by ID

@@ -22,6 +22,7 @@ import {
   Plus,
   Camera,
   Building2,
+  Search,
 } from 'lucide-react';
 import { CocktailRecommendationResult } from '@/app/api/cocktails/recommend/route';
 import { deduceBarCategory, isRecognizedBarStaple } from '@/lib/cocktail-utils';
@@ -114,6 +115,8 @@ export function DigitalBartender() {
   const [selectedSpirit, setSelectedSpirit] = useState<string>('Tequila');
   const [selectedFlavor, setSelectedFlavor] = useState<string>('sour');
   const [selectedComplexity, setSelectedComplexity] = useState<string>('classic');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activeSearchTerm, setActiveSearchTerm] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -125,6 +128,36 @@ export function DigitalBartender() {
     restaurantMatches?: CocktailRecommendationResult[];
     webClassicMatches: CocktailRecommendationResult[];
   } | null>(null);
+
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) return;
+
+    try {
+      setLoading(true);
+      setStep(4);
+      setActiveSearchTerm(query);
+      const res = await fetch('/api/cocktails/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          searchQuery: query,
+          limit: 12,
+          offset: 0,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to find matching cocktails');
+      const data = await res.json();
+      setResults(data.recommendations);
+      setHasMore(false);
+    } catch (err) {
+      alert('Error searching cocktails: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleGenerateRecommendations = async () => {
     try {
@@ -274,6 +307,8 @@ export function DigitalBartender() {
   const resetWizard = () => {
     setStep(1);
     setResults(null);
+    setSearchQuery('');
+    setActiveSearchTerm('');
     setHasMore(true);
   };
 
@@ -297,7 +332,7 @@ export function DigitalBartender() {
             What are you in the mood to sip?
           </h2>
           <p className="text-xs sm:text-sm text-charcoal-400 max-w-2xl mt-1">
-            Answer 3 quick sensory questions to pair your craving with cocktails from your library, bar cart, and global restaurant menus.
+            Search any cocktail or answer 3 quick questions. We check in priority order: <strong>1) Recipe Books</strong> → <strong>2) Restaurant Cocktails</strong> → <strong>3) Web Classics</strong>.
           </p>
         </div>
 
@@ -340,6 +375,34 @@ export function DigitalBartender() {
           )}
         </div>
       </div>
+
+      {/* Instant Cocktail Search Bar with Priority Order Notice */}
+      <form
+        onSubmit={handleSearch}
+        className="bg-[#12151b] border border-amber-900/30 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-3"
+      >
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400/60" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search any cocktail (e.g. Margarita, Negroni, Penicillin, Mezcal Sour)..."
+            className="w-full bg-[#0c0e12] border border-amber-900/40 text-white rounded-xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:border-amber-500 placeholder:text-charcoal-400 font-medium"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="submit"
+            disabled={loading || !searchQuery.trim()}
+            className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-40 text-charcoal-950 font-bold text-xs rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5 shrink-0"
+          >
+            <Search className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Search Cocktails</span>
+          </button>
+        </div>
+      </form>
 
       {/* STEP 1: SPIRIT SELECTION */}
       {step === 1 && (
@@ -528,11 +591,34 @@ export function DigitalBartender() {
             </div>
           ) : results ? (
             <div className="space-y-6">
+              {/* Active Search Banner */}
+              {activeSearchTerm && (
+                <div className="bg-gradient-to-r from-amber-950/40 via-[#1a171d] to-amber-950/40 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-md">
+                  <div className="flex items-center gap-2.5">
+                    <Search className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div>
+                      <span className="text-xs text-amber-200">
+                        Showing results for <strong className="text-white">"{activeSearchTerm}"</strong>
+                      </span>
+                      <p className="text-[11px] text-amber-400/70 font-mono mt-0.5">
+                        Priority Order: 1) Recipe Books → 2) Restaurant Cocktails → 3) Web & Classic Specs
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={resetWizard}
+                    className="text-xs text-amber-300 hover:text-white px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    Clear Search
+                  </button>
+                </div>
+              )}
+
               {/* Filter Pills */}
               <div className="flex items-center justify-between gap-4 flex-wrap bg-[#12151b] p-3 rounded-2xl border border-amber-900/30">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs text-charcoal-400 font-medium">Filter View:</span>
-                  <div className="flex items-center gap-1 text-xs">
+                  <div className="flex items-center gap-1 text-xs flex-wrap">
                     <button
                       onClick={() => setResultFilter('all')}
                       className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
@@ -541,7 +627,7 @@ export function DigitalBartender() {
                           : 'text-charcoal-400 hover:text-white'
                       }`}
                     >
-                      All ({(results.libraryMatches?.length || 0) + (results.restaurantMatches?.length || 0) + (results.webClassicMatches?.length || 0)})
+                      All (Priority Order: Books → Restaurants → Web) ({(results.libraryMatches?.length || 0) + (results.restaurantMatches?.length || 0) + (results.webClassicMatches?.length || 0)})
                     </button>
                     <button
                       onClick={() => setResultFilter('books')}
@@ -551,7 +637,7 @@ export function DigitalBartender() {
                           : 'text-charcoal-400 hover:text-white'
                       }`}
                     >
-                      📖 Books ({results.libraryMatches?.length || 0})
+                      📖 1. Recipe Books ({results.libraryMatches?.length || 0})
                     </button>
                     <button
                       onClick={() => setResultFilter('restaurant')}
@@ -561,7 +647,7 @@ export function DigitalBartender() {
                           : 'text-charcoal-400 hover:text-white'
                       }`}
                     >
-                      🍸 Restaurant Menus ({results.restaurantMatches?.length || 0})
+                      🏛️ 2. Restaurant Cocktails ({results.restaurantMatches?.length || 0})
                     </button>
                     <button
                       onClick={() => setResultFilter('digital')}
@@ -571,7 +657,7 @@ export function DigitalBartender() {
                           : 'text-charcoal-400 hover:text-white'
                       }`}
                     >
-                      🌐 Curated ({results.webClassicMatches?.length || 0})
+                      🌐 3. Web & Classics ({results.webClassicMatches?.length || 0})
                     </button>
                   </div>
                 </div>
@@ -581,7 +667,7 @@ export function DigitalBartender() {
                   className="text-xs font-semibold text-amber-400 hover:text-amber-300 flex items-center gap-1.5 cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Change Options</span>
+                  <span>Start Over</span>
                 </button>
               </div>
 
@@ -592,10 +678,10 @@ export function DigitalBartender() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 font-mono">
-                        <BookOpen className="w-3.5 h-3.5 text-amber-300" /> Books in Your Library
+                        <BookOpen className="w-3.5 h-3.5 text-amber-300" /> 1. Found in Your Recipe Books
                       </span>
                       <span className="text-xs text-charcoal-400">
-                        {results.libraryMatches.length} recipe(s) found in your physical collection
+                        {results.libraryMatches.length} recipe(s) matched in your physical collection
                       </span>
                     </div>
 
@@ -612,14 +698,14 @@ export function DigitalBartender() {
                   </div>
                 )}
 
-              {/* STREAM 1.5: Global Restaurant Menu Cocktails */}
+              {/* STREAM 2: Global Restaurant Menu Cocktails */}
               {(resultFilter === 'all' || resultFilter === 'restaurant') &&
                 results.restaurantMatches &&
                 results.restaurantMatches.length > 0 && (
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center gap-2">
                       <span className="bg-rose-500/20 border border-rose-400/40 text-rose-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 font-mono">
-                        <Building2 className="w-3.5 h-3.5 text-rose-300" /> Restaurant & Speakeasy Menus
+                        <Building2 className="w-3.5 h-3.5 text-rose-300" /> 2. Found in Restaurant & Speakeasy Menus
                       </span>
                       <span className="text-xs text-charcoal-400">
                         {results.restaurantMatches.length} craft cocktail(s) from community-scanned restaurant menus
@@ -639,17 +725,17 @@ export function DigitalBartender() {
                   </div>
                 )}
 
-              {/* STREAM 2: Curated Web Specs (Strictly aligned to taste profile) */}
+              {/* STREAM 3: Curated Web Specs */}
               {(resultFilter === 'all' || resultFilter === 'digital') &&
                 results.webClassicMatches &&
                 results.webClassicMatches.length > 0 && (
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center gap-2">
                       <span className="bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded flex items-center gap-1.5 font-mono">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Curated Recipes ({results.webClassicMatches[0]?.flavorProfile || selectedFlavor})
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" /> 3. Curated Web & Classic Specs
                       </span>
                       <span className="text-xs text-charcoal-400">
-                        Showing recipes tailored to your taste profile & bar cart
+                        {results.webClassicMatches.length} classic cocktail(s) matching your craving & bar stock
                       </span>
                     </div>
 
