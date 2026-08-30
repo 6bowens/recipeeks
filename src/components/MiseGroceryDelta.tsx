@@ -258,7 +258,7 @@ export function MiseGroceryDelta({
             type="button"
             onClick={handleExportToGoogleKeep}
             className="px-3.5 py-2.5 bg-gradient-to-r from-amber-600/40 via-amber-500/40 to-amber-600/40 hover:from-amber-600/60 hover:to-amber-500/60 border border-amber-500/40 text-amber-200 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95"
-            title="Export checklist to Google Keep / Google Notes"
+            title="Export checklist to Notes or Reminders"
           >
             <Share2 className="w-3.5 h-3.5" />
             <span>{keepCopied ? 'Copied & Opening Keep...' : 'Add to Notes'}</span>

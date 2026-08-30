@@ -307,7 +307,7 @@ export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
           <p className="text-xs text-purple-200/70 max-w-sm mx-auto">
             {searchQuery
               ? `No recipes matching "${searchQuery}". Try a different term or clear the search.`
-              : 'Add your favorite dishes via URL, Google Notes, or from your Recipeeks cookbooks.'}
+              : 'Add your favorite dishes via URL, pasted recipe text, or from your Recipeeks cookbooks.'}
           </p>
         </div>
       ) : (

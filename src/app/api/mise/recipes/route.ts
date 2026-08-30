@@ -294,9 +294,15 @@ export async function PATCH(req: Request) {
       }
     }
 
+    const fullUpdatedRecipe = await db.customRecipe.findUnique({
+      where: { id },
+      include: { ingredients: true },
+    });
+
     return NextResponse.json({
       success: true,
       updated: updated.count,
+      recipe: fullUpdatedRecipe,
     });
   } catch (err) {
     console.error('Update recipe error:', err);
