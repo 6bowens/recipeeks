@@ -25,6 +25,7 @@ import {
   ChevronDown,
   Flame,
   UtensilsCrossed,
+  Building2,
 } from 'lucide-react';
 import { MatchedRecipeResult } from '@/types';
 import { CUT_CATEGORIES, CutCategory } from '@/lib/cut-utils';
@@ -287,16 +288,26 @@ export function RecipeMatcher() {
           </p>
         </div>
 
-        {/* Highlight Stats Pill */}
-        <div className="flex items-center gap-3 bg-black/30 backdrop-blur-md px-4 py-2 sm:px-5 sm:py-3 rounded-xl sm:rounded-2xl border border-white/20 text-center self-stretch sm:self-auto justify-around">
-          <div>
-            <div className="text-xl sm:text-2xl font-bold font-serif">{perfectCount}</div>
-            <div className="text-[10px] sm:text-[11px] text-rose-200 uppercase font-semibold">100% Ready</div>
-          </div>
-          <div className="w-px h-7 bg-white/20" />
-          <div>
-            <div className="text-xl sm:text-2xl font-bold font-serif">{missingOneCount}</div>
-            <div className="text-[10px] sm:text-[11px] text-rose-200 uppercase font-semibold">Need 1 Item</div>
+        <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
+          <Link
+            href="/restaurant-menus"
+            className="w-full sm:w-auto px-4 py-2.5 bg-white/15 hover:bg-white/25 border border-white/20 text-white rounded-xl sm:rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-xs"
+          >
+            <Building2 className="w-3.5 h-3.5 text-rose-300" />
+            <span>Restaurant Recipes</span>
+          </Link>
+
+          {/* Highlight Stats Pill */}
+          <div className="flex items-center gap-3 bg-black/30 backdrop-blur-md px-4 py-2 sm:px-5 sm:py-3 rounded-xl sm:rounded-2xl border border-white/20 text-center self-stretch sm:self-auto justify-around">
+            <div>
+              <div className="text-xl sm:text-2xl font-bold font-serif">{perfectCount}</div>
+              <div className="text-[10px] sm:text-[11px] text-rose-200 uppercase font-semibold">100% Ready</div>
+            </div>
+            <div className="w-px h-7 bg-white/20" />
+            <div>
+              <div className="text-xl sm:text-2xl font-bold font-serif">{missingOneCount}</div>
+              <div className="text-[10px] sm:text-[11px] text-rose-200 uppercase font-semibold">Need 1 Item</div>
+            </div>
           </div>
         </div>
       </div>

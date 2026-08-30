@@ -52,6 +52,7 @@ function NavbarContent() {
     { href: '/library', step: 1, label: 'Library', shortLabel: '1. Library', icon: BookOpen },
     { href: '/pantry', step: 2, label: 'Pantry & Fridge', shortLabel: '2. Fridge & Pantry', icon: Layers },
     { href: '/match', step: 3, label: 'Ready to Cook', shortLabel: '3. Ready to Cook', icon: Sparkles, highlight: true },
+    { href: '/restaurant-menus', label: 'Restaurant Menus', shortLabel: 'Restaurant Menus', icon: Building2 },
   ];
 
   const cocktailNavLinks = [
@@ -251,18 +252,22 @@ function NavbarContent() {
                               : 'text-charcoal-600 hover:text-charcoal-900 hover:bg-white'
                           }`}
                         >
-                          <span
-                            className={`w-4 h-4 rounded-full text-[10px] font-extrabold flex items-center justify-center ${
-                              isActive
-                                ? 'bg-white text-red-900'
-                                : 'bg-charcoal-200/90 text-charcoal-700'
-                            }`}
-                          >
-                            {link.step}
-                          </span>
+                          {link.step ? (
+                            <span
+                              className={`w-4 h-4 rounded-full text-[10px] font-extrabold flex items-center justify-center ${
+                                isActive
+                                  ? 'bg-white text-red-900'
+                                  : 'bg-charcoal-200/90 text-charcoal-700'
+                              }`}
+                            >
+                              {link.step}
+                            </span>
+                          ) : (
+                            <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-red-700'}`} />
+                          )}
                           <span>{link.label}</span>
                         </Link>
-                        {idx < cookingNavLinks.length - 1 && (
+                        {link.step && cookingNavLinks[idx + 1]?.step && (
                           <span className="text-charcoal-300 text-xs px-0.5 select-none font-bold">
                             →
                           </span>

@@ -201,9 +201,11 @@ model RestaurantMenu {
   city           String?
   notes          String?
   imageUrl       String?
+  menuType       String               @default("food") // "food", "cocktail", "both"
   userId         String?              // Contributed by user
   user           User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
   cocktails      RestaurantCocktail[]
+  dishes         RestaurantDish[]
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 
@@ -243,5 +245,43 @@ model RestaurantCocktailIngredient {
   cocktail       RestaurantCocktail @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
 
   @@index([cocktailId])
+  @@index([normalizedName])
+}
+
+model RestaurantDish {
+  id              String                     @id @default(cuid())
+  name            String
+  category        String?                    // "Appetizer", "Pasta", "Entree", "Pizza", "Salad", "Soup", "Side", "Dessert", "Brunch", "Main"
+  menuDescription String?                    // Original menu text / notes
+  prepTime        String?                    // "15 mins"
+  cookTime        String?                    // "25 mins"
+  servings        String?                    // "2-4 servings"
+  difficulty      String?                    // "Easy", "Medium", "Chef-level"
+  dietaryTags     String?                    // "Vegetarian, Gluten-Free"
+  chefTips        String?                    // Culinary secret / tip
+  instructions    String?                    // JSON array string of cooking steps
+  menuId          String
+  menu            RestaurantMenu             @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  ingredients     RestaurantDishIngredient[]
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  @@index([menuId])
+  @@index([name])
+  @@index([category])
+}
+
+model RestaurantDishIngredient {
+  id             String         @id @default(cuid())
+  name           String
+  normalizedName String
+  amount         String?        // "2", "1/2", "1"
+  unit           String?        // "tbsp", "cup", "oz", "cloves", "lb", "pinch"
+  aisleCategory  String         @default("pantry") // produce, meat, seafood, dairy, pantry, spices, bakery
+  optional       Boolean        @default(false)
+  dishId         String
+  dish           RestaurantDish @relation(fields: [dishId], references: [id], onDelete: Cascade)
+
+  @@index([dishId])
   @@index([normalizedName])
 }

@@ -1054,5 +1054,158 @@ Output format: Return ONLY a valid JSON object:
   }
 }
 
+export interface ExtractedRestaurantFoodDish {
+  name: string;
+  category?: string; // "Appetizer", "Pasta", "Entree", "Pizza", "Salad", "Soup", "Side", "Dessert", "Brunch", "Main"
+  menuDescription?: string;
+  servings?: string; // "2-4 servings"
+  prepTime?: string; // "15 mins"
+  cookTime?: string; // "25 mins"
+  difficulty?: string; // "Easy", "Medium", "Chef-level"
+  dietaryTags?: string[]; // ["Vegetarian", "Gluten-Free", "Dairy-Free"]
+  chefTips?: string;
+  ingredients: {
+    name: string;
+    amount?: string;
+    unit?: string;
+    aisleCategory?: string; // produce, meat, seafood, dairy, pantry, spices, bakery
+    optional?: boolean;
+  }[];
+  instructions: string[];
+}
+
+export interface ExtractedRestaurantFoodMenuResult {
+  suggestedRestaurantName: string;
+  city?: string;
+  dishes: ExtractedRestaurantFoodDish[];
+}
+
+/**
+ * Scan a printed or digital photo of a restaurant food menu.
+ * Gemini AI performs OCR to extract dishes, and uses culinary intelligence to reverse-engineer
+ * standard home-cooking recipe specs (authentic ratios, technique, chef tips, cooking steps).
+ */
+export async function scanRestaurantFoodMenu(
+  images: { base64Data: string; mimeType: string }[]
+): Promise<ExtractedRestaurantFoodMenuResult> {
+  const genAI = getGeminiClient();
+
+  if (!genAI || images.length === 0) {
+    return {
+      suggestedRestaurantName: 'Bistro & Trattoria',
+      city: 'New York, NY',
+      dishes: [
+        {
+          name: 'Cacio e Pepe Roman Style',
+          category: 'Pasta',
+          menuDescription: 'Handmade tonnarelli, toasted Tellicherry black peppercorns, aged Pecorino Romano',
+          servings: '2-4 servings',
+          prepTime: '10 mins',
+          cookTime: '15 mins',
+          difficulty: 'Medium',
+          dietaryTags: ['Vegetarian'],
+          chefTips: 'Toast the cracked black peppercorns in a dry skillet before adding starchy pasta water to unlock intense floral aromatics.',
+          ingredients: [
+            { name: 'Spaghetti or Tonnarelli', amount: '1', unit: 'lb', aisleCategory: 'pantry', optional: false },
+            { name: 'Pecorino Romano (finely grated)', amount: '1.5', unit: 'cups', aisleCategory: 'dairy', optional: false },
+            { name: 'Whole Black Peppercorns (coarsely cracked)', amount: '1.5', unit: 'tbsp', aisleCategory: 'spices', optional: false },
+            { name: 'Kosher Salt for pasta water', amount: '1', unit: 'tbsp', aisleCategory: 'pantry', optional: false }
+          ],
+          instructions: [
+            'Bring a large pot with moderate water to a gentle boil (less water creates starchier water for emulsification). Salt lightly.',
+            'In a wide skillet over medium heat, toast coarsely cracked black peppercorns for 1-2 minutes until fragrant.',
+            'Ladle 1/2 cup of starchy boiling pasta water into the skillet with the pepper to create a flavorful peppery base.',
+            'Boil pasta until 2 minutes shy of al dente, then transfer directly into the skillet with tongs, tossing vigorously.',
+            'In a bowl, mix finely grated Pecorino Romano with a few splashes of pasta water to form a smooth, creamy paste.',
+            'Remove skillet from heat (crucial to prevent cheese from clumping) and vigorously toss in the cheese paste until a glossy, velvety sauce coats every strand.',
+            'Serve immediately on warm plates with additional cracked pepper and grated Pecorino.'
+          ]
+        }
+      ]
+    };
+  }
+
+  const prompt = `
+You are a world-class executive chef, culinary OCR expert, and food menu analyst.
+Analyze these high-resolution photographs of a restaurant food menu.
+
+Your mission:
+1. RESTAURANT IDENTIFICATION:
+   - Identify the restaurant name from the menu header, logo, watermark, or footer.
+   - Extract the city, state, or country if printed.
+
+2. DISH EXTRACTION:
+   - Extract every distinct food item listed on the menu across all courses (Starters / Appetizers, Pastas, Mains / Entrees, Wood-fired Pizzas, Salads, Soups, Sides, Desserts).
+   - Capture the verbatim menu description (ingredients, cooking method, purveyors, sauces).
+
+3. CULINARY PROPORTION & RECIPE SYNTHESIS:
+   - Restaurant menus typically only list highlighted ingredients (e.g. "Pan-roasted Duck Breast, parsnip puree, sour cherry reduction, roasted shallots") without home cooking measurements.
+   - As an expert chef, reverse-engineer and synthesize an authentic, standard batch home-cooking recipe (typically 2-4 servings) for each dish:
+     * "category": One of "Appetizer", "Pasta", "Entree", "Pizza", "Salad", "Soup", "Side", "Dessert", "Brunch", "Main"
+     * "servings": Standard batch size (e.g., "2-4 servings" or "4 servings")
+     * "prepTime": Estimated active prep time (e.g., "15 mins", "20 mins")
+     * "cookTime": Estimated cooking time (e.g., "25 mins", "40 mins")
+     * "difficulty": One of "Easy", "Medium", "Chef-level"
+     * "dietaryTags": Array of relevant tags (e.g., ["Vegetarian"], ["Gluten-Free"], ["Dairy-Free"], ["Pescatarian"])
+     * "chefTips": A practical, insider chef secret to achieving restaurant-quality execution at home (e.g. pan sear technique, resting meat, sauce reduction, emulsification).
+     * "ingredients": Complete list of ingredients with realistic home quantities and standard units (e.g., "tbsp", "cups", "oz", "lbs", "cloves", "sprigs", "pinch"), and categorized aisle ("produce", "meat", "seafood", "dairy", "pantry", "spices", "bakery").
+     * "instructions": 4 to 7 clear, logical, step-by-step culinary instructions explaining how to prep, cook, and plate the dish.
+
+Output format: Return ONLY a valid JSON object matching this structure:
+{
+  "suggestedRestaurantName": "Restaurant Name",
+  "city": "City, State or Country (optional)",
+  "dishes": [
+    {
+      "name": "Dish Name",
+      "category": "Pasta",
+      "menuDescription": "Raw menu text description",
+      "servings": "2-4 servings",
+      "prepTime": "15 mins",
+      "cookTime": "20 mins",
+      "difficulty": "Medium",
+      "dietaryTags": ["Vegetarian"],
+      "chefTips": "Key chef tip for texture and flavor balance",
+      "ingredients": [
+        { "name": "Ingredient Name", "amount": "2", "unit": "tbsp", "aisleCategory": "dairy", "optional": false }
+      ],
+      "instructions": [
+        "Step 1: Prep and preheat...",
+        "Step 2: Sauté aromatics...",
+        "Step 3: Simmer and reduce...",
+        "Step 4: Plate and garnish..."
+      ]
+    }
+  ]
+}
+`;
+
+  const imageParts = images.map((img) => ({
+    inlineData: {
+      data: img.base64Data,
+      mimeType: img.mimeType,
+    },
+  }));
+
+  try {
+    const responseText = await generateWithFallback(genAI, [prompt, ...imageParts], {
+      responseMimeType: 'application/json',
+      temperature: 0.2,
+    });
+    const parsed = JSON.parse(responseText);
+    const result: ExtractedRestaurantFoodMenuResult = {
+      suggestedRestaurantName: parsed.suggestedRestaurantName ? String(parsed.suggestedRestaurantName).trim() : 'Restaurant & Bistro',
+      city: parsed.city ? String(parsed.city).trim() : undefined,
+      dishes: Array.isArray(parsed.dishes) ? parsed.dishes : [],
+    };
+
+    return result;
+  } catch (error) {
+    console.error('Error scanning restaurant food menu:', error);
+    throw new Error('Failed to analyze restaurant food menu: ' + (error as Error).message);
+  }
+}
+
+
 
 
