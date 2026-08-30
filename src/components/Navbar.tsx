@@ -43,6 +43,7 @@ function NavbarContent() {
 
   const searchParams = useSearchParams();
   const isAdmin = session?.user?.email === '6bowens@gmail.com';
+  const isMenus = pathname.startsWith('/restaurant-menus');
   const isCocktails = pathname.startsWith('/cocktails');
   const isMise = pathname.startsWith('/mise');
   const cocktailTab = searchParams.get('tab') || 'bartender';
@@ -52,7 +53,6 @@ function NavbarContent() {
     { href: '/library', step: 1, label: 'Library', shortLabel: '1. Library', icon: BookOpen },
     { href: '/pantry', step: 2, label: 'Pantry & Fridge', shortLabel: '2. Fridge & Pantry', icon: Layers },
     { href: '/match', step: 3, label: 'Ready to Cook', shortLabel: '3. Ready to Cook', icon: Sparkles, highlight: true },
-    { href: '/restaurant-menus', label: 'Restaurant Menus', shortLabel: 'Restaurant Menus', icon: Building2 },
   ];
 
   const cocktailNavLinks = [
@@ -157,15 +157,32 @@ function NavbarContent() {
     ? 'bg-[#0c0914]/95 border-b border-purple-900/40 text-white shadow-xl'
     : isCocktails
     ? 'bg-[#0b0d10]/95 border-b border-amber-900/30 text-white shadow-lg'
+    : isMenus
+    ? 'bg-[#140e11]/95 border-b border-red-900/40 text-white shadow-xl'
     : 'bg-white/95 border-b border-charcoal-200/80 shadow-xs';
 
   return (
     <header className={`sticky top-0 z-40 backdrop-blur-md transition-colors ${headerBgClass}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
-          {/* 3-Way Brand Switcher Logo */}
+          {/* Brand Switcher Logo */}
           <div className="flex items-center gap-4 sm:gap-6">
-            {isMise ? (
+            {isMenus ? (
+              <Link
+                href="/library"
+                title="Switch to Recipeeks (Kitchen & Bookshelf)"
+                className="flex items-center gap-2.5 group cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-700 via-rose-600 to-red-500 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+                  <Building2 className="w-5 h-5 text-white" />
+                </div>
+                <div className="leading-tight">
+                  <span className="text-xl font-bold font-serif tracking-tight text-rose-200 group-hover:text-rose-100 transition-colors">
+                    Restaurant Menus
+                  </span>
+                </div>
+              </Link>
+            ) : isMise ? (
               <Link
                 href="/library"
                 title="Switch to Recipeeks (Kitchen & Bookshelf)"
@@ -213,7 +230,7 @@ function NavbarContent() {
             )}
 
             {/* Subtle Collection Stats */}
-            {session?.user && stats && !isCocktails && !isMise && (
+            {session?.user && stats && !isCocktails && !isMise && !isMenus && (
               <div className="hidden xl:flex items-center gap-3 text-xs text-charcoal-500 pl-4 border-l border-charcoal-200">
                 <span>
                   <strong className="text-charcoal-900 font-semibold">{stats.totalCookbooks}</strong> Books
@@ -234,10 +251,9 @@ function NavbarContent() {
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Desktop Nav Links */}
             <nav className="hidden md:flex items-center gap-1 sm:gap-1.5">
-              {session?.user && !isCocktails && !isMise ? (
+              {session?.user && !isCocktails && !isMise && !isMenus ? (
                 <div className="flex items-center gap-1 bg-charcoal-50 p-1 rounded-2xl border border-charcoal-200/70 shadow-2xs">
                   {cookingNavLinks.map((link, idx) => {
-                    const Icon = link.icon;
                     const isActive = pathname === link.href;
 
                     return (
@@ -252,22 +268,18 @@ function NavbarContent() {
                               : 'text-charcoal-600 hover:text-charcoal-900 hover:bg-white'
                           }`}
                         >
-                          {link.step ? (
-                            <span
-                              className={`w-4 h-4 rounded-full text-[10px] font-extrabold flex items-center justify-center ${
-                                isActive
-                                  ? 'bg-white text-red-900'
-                                  : 'bg-charcoal-200/90 text-charcoal-700'
-                              }`}
-                            >
-                              {link.step}
-                            </span>
-                          ) : (
-                            <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-red-700'}`} />
-                          )}
+                          <span
+                            className={`w-4 h-4 rounded-full text-[10px] font-extrabold flex items-center justify-center ${
+                              isActive
+                                ? 'bg-white text-red-900'
+                                : 'bg-charcoal-200/90 text-charcoal-700'
+                            }`}
+                          >
+                            {link.step}
+                          </span>
                           <span>{link.label}</span>
                         </Link>
-                        {link.step && cookingNavLinks[idx + 1]?.step && (
+                        {idx < cookingNavLinks.length - 1 && (
                           <span className="text-charcoal-300 text-xs px-0.5 select-none font-bold">
                             →
                           </span>
@@ -275,6 +287,13 @@ function NavbarContent() {
                       </React.Fragment>
                     );
                   })}
+                </div>
+              ) : session?.user && isMenus ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md">
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>Restaurant Menus Directory</span>
+                  </div>
                 </div>
               ) : session?.user && isMise ? (
                 miseNavLinks.map((link: any) => {
@@ -401,7 +420,7 @@ function NavbarContent() {
                         )}
                       </div>
 
-                      {/* 3-Way Mode Switcher Links */}
+                      {/* 4-Way Mode Switcher Links */}
                       <div className="py-1 px-1 space-y-1">
                         <div className="text-[10px] font-bold text-charcoal-400 uppercase tracking-wider px-2 py-0.5 font-mono">
                           Switch Space:
@@ -410,13 +429,25 @@ function NavbarContent() {
                           href="/library"
                           onClick={() => setUserMenuOpen(false)}
                           className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                            !isCocktails && !isMise
+                            !isCocktails && !isMise && !isMenus
                               ? 'bg-red-800/20 text-red-700 font-bold'
                               : 'hover:bg-white/5 text-charcoal-300'
                           }`}
                         >
                           <ChefHat className="w-3.5 h-3.5 text-red-600" />
                           <span>Recipeeks (Kitchen)</span>
+                        </Link>
+                        <Link
+                          href="/restaurant-menus"
+                          onClick={() => setUserMenuOpen(false)}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                            isMenus
+                              ? 'bg-rose-600/20 text-rose-300 font-bold'
+                              : 'hover:bg-white/5 text-charcoal-300'
+                          }`}
+                        >
+                          <Building2 className="w-3.5 h-3.5 text-rose-400" />
+                          <span>Restaurant Menus (Global)</span>
                         </Link>
                         <Link
                           href="/cocktails"
@@ -545,13 +576,13 @@ function NavbarContent() {
                 : 'border-charcoal-200'
             }`}
           >
-            {!isCocktails && !isMise && (
+            {!isCocktails && !isMise && !isMenus && (
               <div className="px-2 py-1 text-[10px] font-bold text-charcoal-400 uppercase tracking-wider font-mono">
                 Kitchen Engine Steps:
               </div>
             )}
 
-            {activeLinks.map((link: any) => {
+            {!isMenus && activeLinks.map((link: any) => {
               const Icon = link.icon;
               const isActive = isMise
                 ? link.tabId === miseTab
@@ -604,23 +635,35 @@ function NavbarContent() {
               );
             })}
 
-            {/* Mobile 3-Way Brand Switcher Section */}
+            {/* Mobile Experience Switcher Selection Bar */}
             <div className="pt-2 mt-2 border-t border-white/5 space-y-1">
               <div className="px-2 py-1 text-[10px] font-bold text-charcoal-400 uppercase tracking-wider font-mono">
                 Switch Experience:
               </div>
-              <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center text-xs">
                 <Link
                   href="/library"
                   onClick={() => setMobileMenuOpen(false)}
                   className={`p-2 rounded-xl border flex flex-col items-center gap-1 ${
-                    !isCocktails && !isMise
+                    !isCocktails && !isMise && !isMenus
                       ? 'bg-red-900/30 border-red-700 text-red-300 font-bold'
                       : 'bg-white/5 border-white/5 text-charcoal-400'
                   }`}
                 >
                   <ChefHat className="w-4 h-4" />
                   <span>Recipeeks</span>
+                </Link>
+                <Link
+                  href="/restaurant-menus"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 ${
+                    isMenus
+                      ? 'bg-rose-900/30 border-rose-700 text-rose-300 font-bold'
+                      : 'bg-white/5 border-white/5 text-charcoal-400'
+                  }`}
+                >
+                  <Building2 className="w-4 h-4" />
+                  <span>Menus</span>
                 </Link>
                 <Link
                   href="/cocktails"

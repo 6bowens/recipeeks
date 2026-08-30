@@ -114,12 +114,6 @@ export default function LibraryPage() {
 
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <Link
-            href="/restaurant-menus"
-            className="flex items-center gap-2 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-200 text-xs font-bold rounded-xl shadow-2xs transition-colors"
-          >
-            <Building2 className="w-4 h-4 text-rose-700" /> Restaurant Menus
-          </Link>
-          <Link
             href="/scan"
             className="flex items-center gap-2 px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
           >
