@@ -169,8 +169,8 @@ function NavbarContent() {
           <div className="flex items-center gap-4 sm:gap-6">
             {isMenus ? (
               <Link
-                href="/library"
-                title="Switch to Recipeeks (Kitchen & Bookshelf)"
+                href="/mise"
+                title="Switch to Mise (Meal Playlist & Grocery List)"
                 className="flex items-center gap-2.5 group cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-700 via-rose-600 to-red-500 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
@@ -199,8 +199,8 @@ function NavbarContent() {
               </Link>
             ) : isCocktails ? (
               <Link
-                href="/mise"
-                title="Switch to Mise (Meal Playlist & Grocery List)"
+                href="/restaurant-menus"
+                title="Switch to Restaurant Menus"
                 className="flex items-center gap-2.5 group cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-charcoal-950 shadow-md group-hover:scale-105 transition-transform">
@@ -420,62 +420,7 @@ function NavbarContent() {
                         )}
                       </div>
 
-                      {/* 4-Way Mode Switcher Links */}
-                      <div className="py-1 px-1 space-y-1">
-                        <div className="text-[10px] font-bold text-charcoal-400 uppercase tracking-wider px-2 py-0.5 font-mono">
-                          Switch Space:
-                        </div>
-                        <Link
-                          href="/library"
-                          onClick={() => setUserMenuOpen(false)}
-                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                            !isCocktails && !isMise && !isMenus
-                              ? 'bg-red-800/20 text-red-700 font-bold'
-                              : 'hover:bg-white/5 text-charcoal-300'
-                          }`}
-                        >
-                          <ChefHat className="w-3.5 h-3.5 text-red-600" />
-                          <span>Recipeeks (Kitchen)</span>
-                        </Link>
-                        <Link
-                          href="/restaurant-menus"
-                          onClick={() => setUserMenuOpen(false)}
-                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                            isMenus
-                              ? 'bg-rose-600/20 text-rose-300 font-bold'
-                              : 'hover:bg-white/5 text-charcoal-300'
-                          }`}
-                        >
-                          <Building2 className="w-3.5 h-3.5 text-rose-400" />
-                          <span>Restaurant Menus (Global)</span>
-                        </Link>
-                        <Link
-                          href="/cocktails"
-                          onClick={() => setUserMenuOpen(false)}
-                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                            isCocktails
-                              ? 'bg-amber-500/20 text-amber-300 font-bold'
-                              : 'hover:bg-white/5 text-charcoal-300'
-                          }`}
-                        >
-                          <Wine className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Pour Decisions (Cocktails)</span>
-                        </Link>
-                        <Link
-                          href="/mise"
-                          onClick={() => setUserMenuOpen(false)}
-                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                            isMise
-                              ? 'bg-purple-600/20 text-purple-300 font-bold'
-                              : 'hover:bg-white/5 text-charcoal-300'
-                          }`}
-                        >
-                          <UtensilsCrossed className="w-3.5 h-3.5 text-purple-400" />
-                          <span>Mise (Dinner & Delta)</span>
-                        </Link>
-                      </div>
-
-                      <div className="space-y-1 pt-1 border-t border-white/5">
+                      <div className="space-y-1 pt-1">
                         {isAdmin && (
                           <Link
                             href="/admin"
@@ -634,63 +579,6 @@ function NavbarContent() {
                 </Link>
               );
             })}
-
-            {/* Mobile Experience Switcher Selection Bar */}
-            <div className="pt-2 mt-2 border-t border-white/5 space-y-1">
-              <div className="px-2 py-1 text-[10px] font-bold text-charcoal-400 uppercase tracking-wider font-mono">
-                Switch Experience:
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center text-xs">
-                <Link
-                  href="/library"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 ${
-                    !isCocktails && !isMise && !isMenus
-                      ? 'bg-red-900/30 border-red-700 text-red-300 font-bold'
-                      : 'bg-white/5 border-white/5 text-charcoal-400'
-                  }`}
-                >
-                  <ChefHat className="w-4 h-4" />
-                  <span>Recipeeks</span>
-                </Link>
-                <Link
-                  href="/restaurant-menus"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 ${
-                    isMenus
-                      ? 'bg-rose-900/30 border-rose-700 text-rose-300 font-bold'
-                      : 'bg-white/5 border-white/5 text-charcoal-400'
-                  }`}
-                >
-                  <Building2 className="w-4 h-4" />
-                  <span>Menus</span>
-                </Link>
-                <Link
-                  href="/cocktails"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 ${
-                    isCocktails
-                      ? 'bg-amber-900/30 border-amber-700 text-amber-300 font-bold'
-                      : 'bg-white/5 border-white/5 text-charcoal-400'
-                  }`}
-                >
-                  <Wine className="w-4 h-4" />
-                  <span>Cocktails</span>
-                </Link>
-                <Link
-                  href="/mise"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 ${
-                    isMise
-                      ? 'bg-purple-900/30 border-purple-700 text-purple-300 font-bold'
-                      : 'bg-white/5 border-white/5 text-charcoal-400'
-                  }`}
-                >
-                  <UtensilsCrossed className="w-4 h-4" />
-                  <span>Mise</span>
-                </Link>
-              </div>
-            </div>
 
             {isAdmin && (
               <Link
