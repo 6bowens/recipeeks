@@ -240,20 +240,10 @@ export function RestaurantMenusDirectory() {
 
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-[#1c1214] via-[#140e10] to-[#241318] border border-amber-900/40 rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="space-y-1.5 max-w-2xl">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded flex items-center gap-1.5 font-mono">
-              <Building2 className="w-3.5 h-3.5 text-amber-400" /> Global Restaurant Cocktails
-            </span>
-            <span className="text-xs text-amber-400/60 font-mono">Community Speakeasy Directory</span>
-          </div>
-
-          <h2 className="text-2xl sm:text-3xl font-serif font-bold text-white leading-tight">
-            Imported Restaurant Cocktails
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-serif font-bold text-white leading-tight flex items-center gap-2.5">
+            <Building2 className="w-7 h-7 text-amber-400" /> Local Faves
           </h2>
-          <p className="text-xs sm:text-sm text-amber-200/70 leading-relaxed">
-            Browse all cocktails imported from restaurant menus around the world with synthesized craft ratios, glassware, and step-by-step methods matched against your home bar cart.
-          </p>
         </div>
 
         <button

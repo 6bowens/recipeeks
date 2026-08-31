@@ -426,10 +426,10 @@ export function DigitalBartender() {
           <Link
             href="/cocktails?tab=menus"
             className="px-3.5 py-2 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-200 hover:text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95"
-            title="Browse all imported restaurant cocktails"
+            title="Browse all local restaurant favourites"
           >
             <Building2 className="w-3.5 h-3.5 text-rose-400" />
-            <span>Restaurant Cocktails</span>
+            <span>Local Faves</span>
           </Link>
 
           <button
