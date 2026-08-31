@@ -337,11 +337,6 @@ export function RecipeMatcher() {
       {/* Hero match header */}
       <div className="bg-gradient-to-r from-crimson-950 via-crimson-900 to-rose-900 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="bg-white/20 px-2.5 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1 text-rose-200">
-              <Sparkles className="w-3 h-3 text-rose-300" /> What&rsquo;s Cookin Good Lookin?
-            </span>
-          </div>
           <h2 className="text-xl sm:text-3xl lg:text-4xl font-serif font-bold leading-tight">
             Ready to Cook
           </h2>
