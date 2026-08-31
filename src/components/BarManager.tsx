@@ -276,7 +276,7 @@ export function BarManager() {
             className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm backdrop-blur-md border border-white/20 shadow-md transition-all cursor-pointer"
           >
             <Upload className="w-4 h-4 text-amber-200" />
-            <span>Photo Library</span>
+            <span>Camera Roll</span>
           </button>
 
           <button

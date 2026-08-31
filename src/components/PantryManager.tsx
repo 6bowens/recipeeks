@@ -404,8 +404,16 @@ export function PantryManager() {
             className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs sm:text-sm backdrop-blur-md border border-white/20 shadow-md transition-all disabled:opacity-50 cursor-pointer"
           >
             <Upload className="w-4 h-4 text-rose-200" />
-            <span>Library</span>
+            <span>Camera Roll</span>
           </button>
+
+          <Link
+            href="/match"
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-charcoal-900 hover:bg-black text-white font-bold text-xs sm:text-sm shadow-md transition-all hover:scale-105 cursor-pointer border border-white/10"
+          >
+            <span>Next: Ready to Cook</span>
+            <ArrowRight className="w-4 h-4 text-red-400" />
+          </Link>
         </div>
       </div>
 
