@@ -23,6 +23,7 @@ import {
   Link as LinkIcon,
   Loader2,
   UtensilsCrossed,
+  Star,
 } from 'lucide-react';
 import { BudgetLimitModal } from '@/components/BudgetLimitModal';
 
@@ -90,6 +91,61 @@ export function RecipeModal({
   // Mise import state
   const [miseAddingId, setMiseAddingId] = useState<string | null>(null);
   const [miseToast, setMiseToast] = useState<string | null>(null);
+
+  // Favorites state
+  const [favoriteKeys, setFavoriteKeys] = useState<Set<string>>(new Set());
+
+  const fetchFavorites = async () => {
+    try {
+      const res = await fetch('/api/favorites?type=recipe');
+      if (res.ok) {
+        const data = await res.json();
+        setFavoriteKeys(new Set(data.favoriteKeys || []));
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchFavorites();
+  }, []);
+
+  const handleToggleFavorite = async (recipe: Recipe) => {
+    const key = recipe.id;
+    const isFav = favoriteKeys.has(key) || favoriteKeys.has(recipe.title.toLowerCase().trim());
+
+    setFavoriteKeys((prev) => {
+      const next = new Set(prev);
+      if (isFav) {
+        next.delete(key);
+        next.delete(recipe.title.toLowerCase().trim());
+        setMiseToast(`Removed "${recipe.title}" from favourites`);
+      } else {
+        next.add(key);
+        next.add(recipe.title.toLowerCase().trim());
+        setMiseToast(`★ Added "${recipe.title}" to favourites!`);
+      }
+      return next;
+    });
+    setTimeout(() => setMiseToast(null), 3000);
+
+    try {
+      await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'recipe',
+          title: recipe.title,
+          sourceType: 'cookbook',
+          cookbookTitle: cookbook?.title,
+          pageNumber: recipe.pageNumber,
+          recipeId: recipe.id,
+        }),
+      });
+    } catch (e) {
+      console.error('Error toggling favorite:', e);
+      fetchFavorites();
+    }
+  };
 
   const handleAddToMise = async (recipeId: string, title: string) => {
     try {
@@ -635,8 +691,35 @@ export function RecipeModal({
                       </div>
                     </div>
 
-                    <div className="shrink-0 text-charcoal-400">
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleFavorite(recipe);
+                        }}
+                        title={
+                          favoriteKeys.has(recipe.id) || favoriteKeys.has(recipe.title.toLowerCase().trim())
+                            ? 'Remove from favourites'
+                            : 'Star as favourite'
+                        }
+                        className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                          favoriteKeys.has(recipe.id) || favoriteKeys.has(recipe.title.toLowerCase().trim())
+                            ? 'bg-amber-50 border-amber-300 text-amber-500 hover:bg-red-50 hover:border-red-300 hover:text-red-600'
+                            : 'bg-white border-charcoal-200 text-charcoal-400 hover:text-amber-500 hover:border-amber-300 hover:bg-amber-50/50'
+                        }`}
+                      >
+                        <Star
+                          className={`w-3.5 h-3.5 ${
+                            favoriteKeys.has(recipe.id) || favoriteKeys.has(recipe.title.toLowerCase().trim())
+                              ? 'fill-amber-400'
+                              : ''
+                          }`}
+                        />
+                      </button>
+
+                      <div className="text-charcoal-400 p-1">
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </div>
                     </div>
                   </div>
 
@@ -648,6 +731,31 @@ export function RecipeModal({
                           Ingredients ({completedCount}/{totalCount} checked)
                         </span>
                         <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleFavorite(recipe);
+                            }}
+                            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
+                              favoriteKeys.has(recipe.id) || favoriteKeys.has(recipe.title.toLowerCase().trim())
+                                ? 'bg-amber-50 border-amber-300 text-amber-800'
+                                : 'bg-white border-charcoal-200 text-charcoal-600 hover:border-amber-300 hover:bg-amber-50/50'
+                            }`}
+                          >
+                            <Star
+                              className={`w-3 h-3 ${
+                                favoriteKeys.has(recipe.id) || favoriteKeys.has(recipe.title.toLowerCase().trim())
+                                  ? 'fill-amber-400 text-amber-500'
+                                  : 'text-charcoal-400'
+                              }`}
+                            />
+                            <span>
+                              {favoriteKeys.has(recipe.id) || favoriteKeys.has(recipe.title.toLowerCase().trim())
+                                ? 'Favourited'
+                                : 'Favourite'}
+                            </span>
+                          </button>
+
                           <button
                             onClick={(e) => {
                               e.stopPropagation();

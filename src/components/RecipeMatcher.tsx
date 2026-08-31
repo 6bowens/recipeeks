@@ -50,6 +50,62 @@ export function RecipeMatcher() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
+  // Favorites state
+  const [favoriteKeys, setFavoriteKeys] = useState<Set<string>>(new Set());
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const fetchFavorites = async () => {
+    try {
+      const res = await fetch('/api/favorites?type=recipe');
+      if (res.ok) {
+        const data = await res.json();
+        setFavoriteKeys(new Set(data.favoriteKeys || []));
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchFavorites();
+  }, []);
+
+  const handleToggleFavorite = async (item: MatchedRecipeResult) => {
+    const key = item.recipeId;
+    const isFav = favoriteKeys.has(key) || favoriteKeys.has(item.recipeTitle.toLowerCase().trim());
+
+    setFavoriteKeys((prev) => {
+      const next = new Set(prev);
+      if (isFav) {
+        next.delete(key);
+        next.delete(item.recipeTitle.toLowerCase().trim());
+        setToastMessage(`Removed "${item.recipeTitle}" from favourites`);
+      } else {
+        next.add(key);
+        next.add(item.recipeTitle.toLowerCase().trim());
+        setToastMessage(`★ Added "${item.recipeTitle}" to favourites!`);
+      }
+      return next;
+    });
+    setTimeout(() => setToastMessage(null), 3000);
+
+    try {
+      await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'recipe',
+          title: item.recipeTitle,
+          sourceType: 'cookbook',
+          cookbookTitle: item.cookbookTitle,
+          pageNumber: item.pageNumber,
+          recipeId: item.recipeId,
+        }),
+      });
+    } catch (e) {
+      console.error('Error toggling favorite:', e);
+      fetchFavorites();
+    }
+  };
+
   // Load hidden recipe IDs from localStorage on mount
   useEffect(() => {
     try {
@@ -264,8 +320,14 @@ export function RecipeMatcher() {
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full max-w-full overflow-x-hidden">
-      {/* Mise Toast Notification */}
-      {miseToast && (
+      {/* Toast Notifications */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-charcoal-900 border border-charcoal-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 font-semibold text-xs">
+          <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+      {miseToast && !toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-purple-950 border border-purple-500 text-purple-200 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 font-semibold text-xs">
           <UtensilsCrossed className="w-4 h-4 text-purple-400" />
           <span>{miseToast}</span>
@@ -671,6 +733,31 @@ export function RecipeMatcher() {
                             {item.matchScore}%
                           </span>
                         )}
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleFavorite(item);
+                          }}
+                          className={`inline-flex items-center gap-0.5 p-1 sm:px-1.5 sm:py-0.5 rounded-md border text-[10px] font-semibold transition-all cursor-pointer ${
+                            favoriteKeys.has(item.recipeId) || favoriteKeys.has(item.recipeTitle.toLowerCase().trim())
+                              ? 'bg-amber-50 border-amber-300 text-amber-600 hover:bg-red-50 hover:border-red-300 hover:text-red-600'
+                              : 'bg-white border-charcoal-200 text-charcoal-400 hover:text-amber-500 hover:border-amber-300 hover:bg-amber-50/50'
+                          }`}
+                          title={
+                            favoriteKeys.has(item.recipeId) || favoriteKeys.has(item.recipeTitle.toLowerCase().trim())
+                              ? 'Remove from favourites'
+                              : 'Star as favourite'
+                          }
+                        >
+                          <Star
+                            className={`w-3 h-3 ${
+                              favoriteKeys.has(item.recipeId) || favoriteKeys.has(item.recipeTitle.toLowerCase().trim())
+                                ? 'fill-amber-400 text-amber-500'
+                                : ''
+                            }`}
+                          />
+                        </button>
 
                         <button
                           onClick={(e) => {

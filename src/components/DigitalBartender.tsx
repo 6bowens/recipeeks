@@ -23,10 +23,12 @@ import {
   Camera,
   Building2,
   Search,
+  Star,
 } from 'lucide-react';
 import { CocktailRecommendationResult } from '@/app/api/cocktails/recommend/route';
 import { deduceBarCategory, isRecognizedBarStaple } from '@/lib/cocktail-utils';
 import { MenuScanModal } from '@/components/MenuScanModal';
+import { FavoritesModal } from '@/components/FavoritesModal';
 
 const SPIRIT_OPTIONS = [
   { id: 'Bourbon', label: 'Bourbon / Rye', icon: '🥃', desc: 'Warm oak, caramel & rye spice' },
@@ -123,6 +125,80 @@ export function DigitalBartender() {
   const [addingIng, setAddingIng] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showMenuScanModal, setShowMenuScanModal] = useState(false);
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [favoritesCount, setFavoritesCount] = useState(0);
+  const [favoriteKeys, setFavoriteKeys] = useState<Set<string>>(new Set());
+
+  const fetchFavorites = async () => {
+    try {
+      const res = await fetch('/api/favorites?type=cocktail');
+      if (res.ok) {
+        const data = await res.json();
+        setFavoritesCount(data.count || 0);
+        setFavoriteKeys(new Set(data.favoriteKeys || []));
+      }
+    } catch (e) {
+      console.error('Error fetching favorites:', e);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchFavorites();
+  }, []);
+
+  const handleToggleFavorite = async (cocktail: CocktailRecommendationResult) => {
+    const key = (cocktail.id || cocktail.name).toLowerCase().trim();
+    const isFav = favoriteKeys.has(key) || favoriteKeys.has(cocktail.name.toLowerCase().trim());
+
+    // Optimistic toggle
+    setFavoriteKeys((prev) => {
+      const next = new Set(prev);
+      if (isFav) {
+        next.delete(key);
+        next.delete(cocktail.name.toLowerCase().trim());
+        setFavoritesCount((c) => Math.max(0, c - 1));
+        setToastMessage(`Removed "${cocktail.name}" from favourites`);
+      } else {
+        next.add(key);
+        next.add(cocktail.name.toLowerCase().trim());
+        setFavoritesCount((c) => c + 1);
+        setToastMessage(`★ Added "${cocktail.name}" to favourites!`);
+      }
+      return next;
+    });
+    setTimeout(() => setToastMessage(null), 3000);
+
+    try {
+      await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'cocktail',
+          title: cocktail.name,
+          sourceType: cocktail.source === 'restaurant_menu' ? 'restaurant' : cocktail.source === 'library' ? 'cookbook' : 'web',
+          cookbookTitle: cocktail.bookTitle,
+          pageNumber: cocktail.pageNumber,
+          recipeId: cocktail.source === 'library' ? cocktail.id : undefined,
+          restaurantCocktailId: cocktail.source === 'restaurant_menu' ? cocktail.id : undefined,
+          metadata: {
+            spiritBase: cocktail.spiritBase,
+            flavorProfile: cocktail.flavorProfile,
+            glassware: cocktail.glassware,
+            ice: cocktail.ice,
+            technique: cocktail.technique,
+            garnish: cocktail.garnish,
+            instructions: cocktail.instructions,
+            ingredients: cocktail.ingredients,
+            restaurantName: cocktail.restaurantName,
+          },
+        }),
+      });
+    } catch (e) {
+      console.error('Error toggling cocktail favorite:', e);
+      fetchFavorites();
+    }
+  };
+
   const [results, setResults] = useState<{
     libraryMatches: CocktailRecommendationResult[];
     restaurantMatches?: CocktailRecommendationResult[];
@@ -338,6 +414,15 @@ export function DigitalBartender() {
 
         {/* Step Indicator & Actions */}
         <div className="relative z-10 shrink-0 flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowFavorites(true)}
+            className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 hover:text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer active:scale-95"
+            title="View all starred favourite cocktails"
+          >
+            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+            <span>Favourites {favoritesCount > 0 ? `(${favoritesCount})` : ''}</span>
+          </button>
+
           <Link
             href="/cocktails?tab=menus"
             className="px-3.5 py-2 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-200 hover:text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95"
@@ -692,6 +777,11 @@ export function DigitalBartender() {
                           cocktail={drink}
                           onQuickAdd={handleQuickAddIngredient}
                           addingIng={addingIng}
+                          isFavorite={
+                            favoriteKeys.has(drink.id.toLowerCase().trim()) ||
+                            favoriteKeys.has(drink.name.toLowerCase().trim())
+                          }
+                          onToggleFavorite={handleToggleFavorite}
                         />
                       ))}
                     </div>
@@ -719,6 +809,11 @@ export function DigitalBartender() {
                           cocktail={drink}
                           onQuickAdd={handleQuickAddIngredient}
                           addingIng={addingIng}
+                          isFavorite={
+                            favoriteKeys.has(drink.id.toLowerCase().trim()) ||
+                            favoriteKeys.has(drink.name.toLowerCase().trim())
+                          }
+                          onToggleFavorite={handleToggleFavorite}
                         />
                       ))}
                     </div>
@@ -746,6 +841,11 @@ export function DigitalBartender() {
                           cocktail={drink}
                           onQuickAdd={handleQuickAddIngredient}
                           addingIng={addingIng}
+                          isFavorite={
+                            favoriteKeys.has(drink.id.toLowerCase().trim()) ||
+                            favoriteKeys.has(drink.name.toLowerCase().trim())
+                          }
+                          onToggleFavorite={handleToggleFavorite}
                         />
                       ))}
                     </div>
@@ -802,6 +902,17 @@ export function DigitalBartender() {
           handleGenerateRecommendations();
         }}
       />
+
+      {/* Favorites Modal */}
+      <FavoritesModal
+        isOpen={showFavorites}
+        onClose={() => {
+          setShowFavorites(false);
+          fetchFavorites();
+        }}
+        initialType="cocktail"
+        onFavoritesChange={fetchFavorites}
+      />
     </div>
   );
 }
@@ -810,15 +921,19 @@ function CocktailCard({
   cocktail,
   onQuickAdd,
   addingIng,
+  isFavorite,
+  onToggleFavorite,
 }: {
   cocktail: CocktailRecommendationResult;
   onQuickAdd: (ingredientName: string) => void;
   addingIng: string | null;
+  isFavorite?: boolean;
+  onToggleFavorite?: (cocktail: CocktailRecommendationResult) => void;
 }) {
   const flavorBadge = getFlavorBadge(cocktail.flavorProfile);
 
   return (
-    <div className="bg-[#13161c] rounded-2xl border border-white/10 p-5 shadow-xl flex flex-col justify-between hover:border-amber-500/40 transition-colors">
+    <div className="bg-[#13161c] rounded-2xl border border-white/10 p-5 shadow-xl flex flex-col justify-between hover:border-amber-500/40 transition-colors relative">
       <div>
         {/* Header Badges: Dynamic Taste Profile & Spirit */}
         <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
@@ -843,15 +958,34 @@ function CocktailCard({
             </span>
           </div>
 
-          <span
-            className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-              cocktail.matchScore === 100
-                ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/50'
-                : 'bg-amber-950 text-amber-300 border border-amber-500/50'
-            }`}
-          >
-            {cocktail.matchScore}% Ready
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                cocktail.matchScore === 100
+                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/50'
+                  : 'bg-amber-950 text-amber-300 border border-amber-500/50'
+              }`}
+            >
+              {cocktail.matchScore}% Ready
+            </span>
+
+            {onToggleFavorite && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite(cocktail);
+                }}
+                title={isFavorite ? 'Remove from favourites' : 'Star as favourite'}
+                className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                  isFavorite
+                    ? 'bg-amber-500/20 border-amber-400/60 text-amber-400 hover:bg-red-500/20 hover:border-red-500/50 hover:text-red-400'
+                    : 'bg-white/5 border-white/10 text-charcoal-400 hover:text-amber-400 hover:border-amber-400/40 hover:bg-white/10'
+                }`}
+              >
+                <Star className={`w-3.5 h-3.5 ${isFavorite ? 'fill-amber-400' : ''}`} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Title & Description */}

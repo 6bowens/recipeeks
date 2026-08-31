@@ -14,15 +14,29 @@ import {
   ArrowRight,
   Layers,
   Building2,
+  Star,
 } from 'lucide-react';
 import { BookCard } from '@/components/BookCard';
 import { RecipeModal } from '@/components/RecipeModal';
+import { FavoritesModal } from '@/components/FavoritesModal';
 
 export default function LibraryPage() {
   const [cookbooks, setCookbooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCookbook, setSelectedCookbook] = useState<any | null>(null);
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [favoritesCount, setFavoritesCount] = useState(0);
+
+  const fetchFavoritesCount = async () => {
+    try {
+      const res = await fetch('/api/favorites?type=recipe');
+      if (res.ok) {
+        const data = await res.json();
+        setFavoritesCount(data.count || 0);
+      }
+    } catch {}
+  };
 
   const fetchCookbooks = async () => {
     try {
@@ -55,6 +69,7 @@ export default function LibraryPage() {
 
   useEffect(() => {
     fetchCookbooks();
+    fetchFavoritesCount();
   }, []);
 
   const handleOpenCookbook = async (id: string) => {
@@ -113,6 +128,14 @@ export default function LibraryPage() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <button
+            onClick={() => setShowFavorites(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100/80 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+            title="View all starred favourite recipes"
+          >
+            <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+            <span>Favourites {favoritesCount > 0 ? `(${favoritesCount})` : ''}</span>
+          </button>
           <Link
             href="/scan"
             className="flex items-center gap-2 px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
@@ -248,6 +271,17 @@ export default function LibraryPage() {
         onCookbookUpdated={() => {
           fetchCookbooks();
         }}
+      />
+
+      {/* Favorites Modal */}
+      <FavoritesModal
+        isOpen={showFavorites}
+        onClose={() => {
+          setShowFavorites(false);
+          fetchFavoritesCount();
+        }}
+        initialType="recipe"
+        onFavoritesChange={fetchFavoritesCount}
       />
     </div>
   );

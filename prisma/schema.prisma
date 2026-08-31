@@ -28,6 +28,7 @@ model User {
   mealPlaylists      MealPlaylist[]
   mealHistory        MealHistory[]
   restaurantMenus    RestaurantMenu[]
+  favorites          Favorite[]
 }
 
 model AiUsageLog {
@@ -78,6 +79,7 @@ model Recipe {
   cookbookId     String
   cookbook       Cookbook      @relation(fields: [cookbookId], references: [id], onDelete: Cascade)
   ingredients    Ingredient[]
+  favorites      Favorite[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -144,6 +146,7 @@ model CustomRecipe {
   userId            String
   user              User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   ingredients       CustomRecipeIngredient[]
+  favorites         Favorite[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 
@@ -227,6 +230,7 @@ model RestaurantCocktail {
   menuId          String
   menu            RestaurantMenu                 @relation(fields: [menuId], references: [id], onDelete: Cascade)
   ingredients     RestaurantCocktailIngredient[]
+  favorites       Favorite[]
   createdAt       DateTime                       @default(now())
   updatedAt       DateTime                       @updatedAt
 
@@ -263,6 +267,7 @@ model RestaurantDish {
   menuId          String
   menu            RestaurantMenu             @relation(fields: [menuId], references: [id], onDelete: Cascade)
   ingredients     RestaurantDishIngredient[]
+  favorites       Favorite[]
   createdAt       DateTime                   @default(now())
   updatedAt       DateTime                   @updatedAt
 
@@ -284,4 +289,33 @@ model RestaurantDishIngredient {
 
   @@index([dishId])
   @@index([normalizedName])
+}
+
+model Favorite {
+  id                   String              @id @default(cuid())
+  userId               String
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type                 String              // "recipe" (food) or "cocktail"
+  title                String
+  sourceType           String?             // "cookbook", "restaurant", "custom", "web"
+  cookbookTitle        String?
+  pageNumber           Int?
+  recipeId             String?
+  recipe               Recipe?             @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  restaurantDishId     String?
+  restaurantDish       RestaurantDish?     @relation(fields: [restaurantDishId], references: [id], onDelete: Cascade)
+  restaurantCocktailId String?
+  restaurantCocktail   RestaurantCocktail? @relation(fields: [restaurantCocktailId], references: [id], onDelete: Cascade)
+  customRecipeId       String?
+  customRecipe         CustomRecipe?       @relation(fields: [customRecipeId], references: [id], onDelete: Cascade)
+  metadataJson         String?             // JSON string for web cocktail specs, ingredients, instructions, etc.
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@unique([userId, type, title])
+  @@index([userId, type])
+  @@index([recipeId])
+  @@index([restaurantDishId])
+  @@index([restaurantCocktailId])
+  @@index([customRecipeId])
 }

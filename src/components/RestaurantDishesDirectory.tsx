@@ -21,6 +21,7 @@ import {
   Calendar,
   Filter,
   Check,
+  Star,
 } from 'lucide-react';
 import { FoodMenuScanModal } from '@/components/FoodMenuScanModal';
 
@@ -47,6 +48,59 @@ export function RestaurantDishesDirectory() {
   const [addingIng, setAddingIng] = useState<string | null>(null);
   const [importingDishId, setImportingDishId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Favorites state
+  const [favoriteKeys, setFavoriteKeys] = useState<Set<string>>(new Set());
+
+  const fetchFavorites = async () => {
+    try {
+      const res = await fetch('/api/favorites?type=recipe');
+      if (res.ok) {
+        const data = await res.json();
+        setFavoriteKeys(new Set(data.favoriteKeys || []));
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchFavorites();
+  }, []);
+
+  const handleToggleFavorite = async (dish: any) => {
+    const key = dish.id;
+    const isFav = favoriteKeys.has(key) || favoriteKeys.has(dish.name.toLowerCase().trim());
+
+    setFavoriteKeys((prev) => {
+      const next = new Set(prev);
+      if (isFav) {
+        next.delete(key);
+        next.delete(dish.name.toLowerCase().trim());
+        setToastMessage(`Removed "${dish.name}" from favourites`);
+      } else {
+        next.add(key);
+        next.add(dish.name.toLowerCase().trim());
+        setToastMessage(`★ Added "${dish.name}" to favourites!`);
+      }
+      return next;
+    });
+    setTimeout(() => setToastMessage(null), 3000);
+
+    try {
+      await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'recipe',
+          title: dish.name,
+          sourceType: 'restaurant',
+          restaurantDishId: dish.id,
+        }),
+      });
+    } catch (e) {
+      console.error('Error toggling dish favorite:', e);
+      fetchFavorites();
+    }
+  };
 
   const fetchMenus = async () => {
     try {
@@ -380,18 +434,45 @@ export function RestaurantDishesDirectory() {
                         )}
                       </div>
 
-                      {/* Pantry Match Readiness Badge */}
-                      <span
-                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full font-mono shrink-0 ${
-                          dish.matchScore === 100
-                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/60'
-                            : dish.matchScore >= 50
-                            ? 'bg-blue-950 text-blue-300 border border-blue-600/60'
-                            : 'bg-white/5 text-rose-200/60 border border-white/10'
-                        }`}
-                      >
-                        {dish.matchScore}% Pantry Ready
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {/* Pantry Match Readiness Badge */}
+                        <span
+                          className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full font-mono shrink-0 ${
+                            dish.matchScore === 100
+                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/60'
+                              : dish.matchScore >= 50
+                              ? 'bg-blue-950 text-blue-300 border border-blue-600/60'
+                              : 'bg-white/5 text-rose-200/60 border border-white/10'
+                          }`}
+                        >
+                          {dish.matchScore}% Pantry Ready
+                        </span>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleFavorite(dish);
+                          }}
+                          title={
+                            favoriteKeys.has(dish.id) || favoriteKeys.has(dish.name.toLowerCase().trim())
+                              ? 'Remove from favourites'
+                              : 'Star as favourite'
+                          }
+                          className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                            favoriteKeys.has(dish.id) || favoriteKeys.has(dish.name.toLowerCase().trim())
+                              ? 'bg-amber-500/20 border-amber-400/60 text-amber-400 hover:bg-red-500/20 hover:border-red-500/50 hover:text-red-400'
+                              : 'bg-white/5 border-white/10 text-charcoal-400 hover:text-amber-400 hover:border-amber-400/40 hover:bg-white/10'
+                          }`}
+                        >
+                          <Star
+                            className={`w-3.5 h-3.5 ${
+                              favoriteKeys.has(dish.id) || favoriteKeys.has(dish.name.toLowerCase().trim())
+                                ? 'fill-amber-400'
+                                : ''
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Dish Title & Description */}

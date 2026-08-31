@@ -20,9 +20,9 @@ import {
   ChevronUp,
   RefreshCw,
   Share2,
-  Check,
   AlertCircle,
   Filter,
+  Star,
 } from 'lucide-react';
 import { MenuScanModal } from '@/components/MenuScanModal';
 
@@ -48,6 +48,70 @@ export function RestaurantMenusDirectory() {
   const [expandedDrinkId, setExpandedDrinkId] = useState<string | null>(null);
   const [addingIng, setAddingIng] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Favorites state
+  const [favoriteKeys, setFavoriteKeys] = useState<Set<string>>(new Set());
+
+  const fetchFavorites = async () => {
+    try {
+      const res = await fetch('/api/favorites?type=cocktail');
+      if (res.ok) {
+        const data = await res.json();
+        setFavoriteKeys(new Set(data.favoriteKeys || []));
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchFavorites();
+  }, []);
+
+  const handleToggleFavorite = async (cocktail: any) => {
+    const key = cocktail.id;
+    const isFav = favoriteKeys.has(key) || favoriteKeys.has(cocktail.name.toLowerCase().trim());
+
+    setFavoriteKeys((prev) => {
+      const next = new Set(prev);
+      if (isFav) {
+        next.delete(key);
+        next.delete(cocktail.name.toLowerCase().trim());
+        setToastMessage(`Removed "${cocktail.name}" from favourites`);
+      } else {
+        next.add(key);
+        next.add(cocktail.name.toLowerCase().trim());
+        setToastMessage(`★ Added "${cocktail.name}" to favourites!`);
+      }
+      return next;
+    });
+    setTimeout(() => setToastMessage(null), 3000);
+
+    try {
+      await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'cocktail',
+          title: cocktail.name,
+          sourceType: 'restaurant',
+          restaurantCocktailId: cocktail.id,
+          metadata: {
+            spiritBase: cocktail.spiritBase,
+            flavorProfile: cocktail.flavorProfile,
+            glassware: cocktail.glassware,
+            ice: cocktail.ice,
+            technique: cocktail.technique,
+            garnish: cocktail.garnish,
+            instructions: cocktail.instructions,
+            ingredients: cocktail.ingredients,
+            restaurantName: cocktail.menu?.restaurantName,
+          },
+        }),
+      });
+    } catch (e) {
+      console.error('Error toggling cocktail favorite:', e);
+      fetchFavorites();
+    }
+  };
 
   const fetchMenus = async () => {
     try {
@@ -362,18 +426,45 @@ export function RestaurantMenusDirectory() {
                         </span>
                       </div>
 
-                      {/* Bar Match Readiness Badge */}
-                      <span
-                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full font-mono shrink-0 ${
-                          cocktail.matchScore === 100
-                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/60'
-                            : cocktail.matchScore >= 50
-                            ? 'bg-blue-950 text-blue-300 border border-blue-600/60'
-                            : 'bg-white/5 text-amber-200/60 border border-white/10'
-                        }`}
-                      >
-                        {cocktail.matchScore}% Bar Ready
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {/* Bar Match Readiness Badge */}
+                        <span
+                          className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full font-mono shrink-0 ${
+                            cocktail.matchScore === 100
+                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/60'
+                              : cocktail.matchScore >= 50
+                              ? 'bg-blue-950 text-blue-300 border border-blue-600/60'
+                              : 'bg-white/5 text-amber-200/60 border border-white/10'
+                          }`}
+                        >
+                          {cocktail.matchScore}% Bar Ready
+                        </span>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleFavorite(cocktail);
+                          }}
+                          title={
+                            favoriteKeys.has(cocktail.id) || favoriteKeys.has(cocktail.name.toLowerCase().trim())
+                              ? 'Remove from favourites'
+                              : 'Star as favourite'
+                          }
+                          className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                            favoriteKeys.has(cocktail.id) || favoriteKeys.has(cocktail.name.toLowerCase().trim())
+                              ? 'bg-amber-500/20 border-amber-400/60 text-amber-400 hover:bg-red-500/20 hover:border-red-500/50 hover:text-red-400'
+                              : 'bg-white/5 border-white/10 text-charcoal-400 hover:text-amber-400 hover:border-amber-400/40 hover:bg-white/10'
+                          }`}
+                        >
+                          <Star
+                            className={`w-3.5 h-3.5 ${
+                              favoriteKeys.has(cocktail.id) || favoriteKeys.has(cocktail.name.toLowerCase().trim())
+                                ? 'fill-amber-400'
+                                : ''
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Drink Name & Menu Notes */}
