@@ -5,22 +5,35 @@ import shutil
 import sqlite3
 from datetime import datetime
 
-DATA_DIR = os.environ.get("DATA_DIR", "/app/data" if os.path.exists("/app/data") else "./data")
-DB_PATH = os.path.join(DATA_DIR, "recipeeks.db")
-BACKUP_DIR = os.environ.get("BACKUP_DIR", os.path.join(DATA_DIR, "backups"))
+def find_db_path():
+    candidate_paths = [
+        "/app/data/recipeeks.db",
+        "/home/brett/docker/recipeeks/data/recipeeks.db",
+        os.path.expanduser("~/docker/recipeeks/data/recipeeks.db"),
+        "./data/recipeeks.db",
+        "../data/recipeeks.db",
+        "./prisma/dev.db",
+        os.path.join(os.path.dirname(__file__), "..", "backups", "recipeeks_backup_2026-08-31.db"),
+    ]
+    for p in candidate_paths:
+        if os.path.exists(p):
+            return p
+    return None
 
 def run_backup():
-    if not os.path.exists(DB_PATH):
-        print(f"Error: Source database not found at {DB_PATH}")
+    db_path = find_db_path()
+    if not db_path:
+        print("Error: Source database not found in candidate paths.")
         sys.exit(1)
 
-    os.makedirs(BACKUP_DIR, exist_ok=True)
+    backup_dir = os.path.join(os.path.dirname(db_path), "backups")
+    os.makedirs(backup_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     backup_filename = f"recipeeks_backup_{timestamp}.db"
-    backup_path = os.path.join(BACKUP_DIR, backup_filename)
+    backup_path = os.path.join(backup_dir, backup_filename)
 
     # Use SQLite's official online backup API to ensure 100% ACID consistency without locking
-    src_conn = sqlite3.connect(DB_PATH)
+    src_conn = sqlite3.connect(db_path)
     dst_conn = sqlite3.connect(backup_path)
     with dst_conn:
         src_conn.backup(dst_conn)
@@ -31,8 +44,8 @@ def run_backup():
 
     # Rotate old backups - keep last 30
     backups = sorted([
-        os.path.join(BACKUP_DIR, f)
-        for f in os.listdir(BACKUP_DIR)
+        os.path.join(backup_dir, f)
+        for f in os.listdir(backup_dir)
         if f.startswith("recipeeks_backup_") and f.endswith(".db")
     ])
 

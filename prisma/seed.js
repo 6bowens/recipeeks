@@ -12,6 +12,13 @@ function normalize(name) {
 }
 
 async function main() {
+  const existingUsers = await prisma.user.count();
+  const existingCookbooks = await prisma.cookbook.count();
+  if (existingUsers > 0 && existingCookbooks > 0) {
+    console.log('Database already populated, skipping seed.');
+    return;
+  }
+
   console.log('Seeding initial data...');
 
   // Create demo chef account
