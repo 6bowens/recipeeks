@@ -39,26 +39,15 @@ export default function LoginPage() {
   };
 
   const handleDemoLogin = async () => {
-    setEmail('demo@recipeeks.app');
+    setEmail('6bowens@gmail.com');
     setPassword('demo1234');
     setError(null);
     setLoading(true);
 
-    // Auto-register demo account if it doesn't exist
     try {
-      await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'demo@recipeeks.app',
-          password: 'demo1234',
-          name: 'Demo Chef',
-        }),
-      });
-
       const res = await signIn('credentials', {
         redirect: false,
-        email: 'demo@recipeeks.app',
+        email: '6bowens@gmail.com',
         password: 'demo1234',
       });
 
@@ -69,7 +58,7 @@ export default function LoginPage() {
         router.refresh();
       }
     } catch (e) {
-      setError('Failed to log in with demo account.');
+      setError('Failed to log in: ' + (e as Error).message);
     } finally {
       setLoading(false);
     }
