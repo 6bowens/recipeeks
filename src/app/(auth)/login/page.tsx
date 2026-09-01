@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
-import { ChefHat, Lock, Mail, ArrowRight, UserCheck } from 'lucide-react';
+import { ChefHat, Lock, Mail, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,32 +38,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickLogin = async (userEmail: string) => {
-    setEmail(userEmail);
-    setPassword('demo1234');
-    setError(null);
-    setLoading(true);
-
-    try {
-      const res = await signIn('credentials', {
-        redirect: false,
-        email: userEmail,
-        password: 'demo1234',
-      });
-
-      if (res?.error) {
-        setError(res.error);
-      } else {
-        router.push('/library');
-        router.refresh();
-      }
-    } catch (e) {
-      setError('Failed to log in: ' + (e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="max-w-md mx-auto py-12 px-4">
       <div className="bg-white rounded-3xl border border-amber-900/10 shadow-xl p-8 space-y-6">
@@ -84,41 +58,6 @@ export default function LoginPage() {
             {error}
           </div>
         )}
-
-        {/* 1-Click Fast Profile Switcher */}
-        <div className="space-y-2">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-charcoal-400">
-            Quick Family Sign-In:
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('6bowens@gmail.com')}
-              disabled={loading}
-              className="px-3 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-200/90 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
-            >
-              <UserCheck className="w-3.5 h-3.5 text-amber-600" />
-              <span>Brett</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('laura.katherine.mcleod@gmail.com')}
-              disabled={loading}
-              className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-950 border border-rose-200/90 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
-            >
-              <UserCheck className="w-3.5 h-3.5 text-rose-600" />
-              <span>Laura</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="relative flex py-1 items-center">
-          <div className="flex-grow border-t border-charcoal-200"></div>
-          <span className="flex-shrink mx-3 text-charcoal-400 text-[10px] uppercase font-bold tracking-wider">
-            Or With Email
-          </span>
-          <div className="flex-grow border-t border-charcoal-200"></div>
-        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
