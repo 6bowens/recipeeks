@@ -78,9 +78,15 @@ function NavbarContent() {
 
   const miseNavLinks = [
     {
-      href: '/mise?tab=playlist',
-      tabId: 'playlist',
-      label: 'Dinner Playlist',
+      href: '/mise?tab=recipes',
+      tabId: 'recipes',
+      label: 'Recipes',
+      icon: BookMarked,
+    },
+    {
+      href: '/mise?tab=platelist',
+      tabId: 'platelist',
+      label: 'The Platelist',
       icon: Calendar,
     },
     {
@@ -88,12 +94,6 @@ function NavbarContent() {
       tabId: 'delta',
       label: 'Grocery List',
       icon: ShoppingCart,
-    },
-    {
-      href: '/mise?tab=vault',
-      tabId: 'vault',
-      label: 'Recipe Vault',
-      icon: BookMarked,
     },
     {
       href: '/mise?tab=history',

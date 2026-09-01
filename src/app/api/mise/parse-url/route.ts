@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getGeminiClient, generateWithFallback } from '@/lib/gemini';
-import { deduceAisleCategory, cleanRecipeText } from '@/lib/playlist-utils';
+import { deduceAisleCategory, cleanRecipeText, parseIngredientLine } from '@/lib/playlist-utils';
 import { checkUserAiSpend, recordAiSpend } from '@/lib/spend';
+import { parseQuantity } from '@/lib/recipe-scaling';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { url } = await req.json();
+    const { url, autoSave, frequency = '1_week' } = await req.json();
     if (!url || typeof url !== 'string') {
       return NextResponse.json({ error: 'Valid URL is required' }, { status: 400 });
     }
@@ -32,6 +33,11 @@ export async function POST(req: Request) {
     }
 
     const html = await response.text();
+
+    // Extract Open Graph image as fallback
+    const ogImageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+      html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:image["']/i);
+    const ogImage = ogImageMatch ? ogImageMatch[1] : null;
 
     // 2. Try JSON-LD schema parsing first (standard for all recipe blogs)
     const jsonLdMatches = Array.from(
@@ -52,27 +58,66 @@ export async function POST(req: Request) {
             : [];
 
           const instructions: string[] = Array.isArray(recipeObj.recipeInstructions)
-            ? recipeObj.recipeInstructions.map((i: any) => (typeof i === 'string' ? i : i.text || i.name || ''))
+            ? recipeObj.recipeInstructions.map((i: any) => {
+                if (typeof i === 'string') return i;
+                if (i.text) return i.text;
+                if (i.name && !i.text) return i.name;
+                if (Array.isArray(i.itemListElement)) {
+                  return i.itemListElement.map((sub: any) => sub.text || sub.name || '').filter(Boolean).join('\n');
+                }
+                return '';
+              }).filter(Boolean)
             : typeof recipeObj.recipeInstructions === 'string'
             ? [recipeObj.recipeInstructions]
             : [];
 
-          const ingredients = rawIngredients.map((ing) => ({
-            name: ing.replace(/^[0-9\/\.\s\-]+(cups?|tbsp|tsp|oz|lbs?|cloves?|grams?|pinch|cans?|stalks?|bunches?)?\s+/i, '').trim(),
-            amount: (ing.match(/^[0-9\/\.\s\-]+(cups?|tbsp|tsp|oz|lbs?|cloves?|grams?|pinch|cans?|stalks?|bunches?)?/i) || [''])[0].trim() || '',
-            unit: '',
-            aisleCategory: deduceAisleCategory(ing),
-          }));
+          const ingredients = rawIngredients.map((rawIng) => {
+            const parsed = parseIngredientLine(rawIng);
+            return {
+              name: parsed.name,
+              amount: parsed.amount || '',
+              unit: parsed.unit || '',
+              aisleCategory: parsed.aisleCategory || deduceAisleCategory(parsed.name),
+            };
+          });
+
+          // Extract image
+          let imageUrl = ogImage;
+          if (recipeObj.image) {
+            if (typeof recipeObj.image === 'string') imageUrl = recipeObj.image;
+            else if (Array.isArray(recipeObj.image) && recipeObj.image[0]) {
+              imageUrl = typeof recipeObj.image[0] === 'string' ? recipeObj.image[0] : recipeObj.image[0].url || ogImage;
+            } else if (recipeObj.image.url) {
+              imageUrl = recipeObj.image.url;
+            }
+          }
+
+          const servingsStr = recipeObj.recipeYield
+            ? Array.isArray(recipeObj.recipeYield)
+              ? recipeObj.recipeYield[0]
+              : String(recipeObj.recipeYield)
+            : '4';
+
+          const tags = Array.isArray(recipeObj.keywords)
+            ? recipeObj.keywords.join(', ')
+            : typeof recipeObj.keywords === 'string'
+            ? recipeObj.keywords
+            : null;
 
           return NextResponse.json({
             success: true,
             recipe: {
-              title: recipeObj.name || 'Imported Recipe',
-              servings: recipeObj.recipeYield ? String(recipeObj.recipeYield) : '2-4',
-              prepTime: recipeObj.prepTime || '',
-              cookTime: recipeObj.cookTime || recipeObj.totalTime || '',
+              title: cleanRecipeText(recipeObj.name || 'Imported Recipe'),
+              servings: cleanRecipeText(servingsStr),
+              servingsNum: parseQuantity(servingsStr) || 4.0,
+              prepTime: recipeObj.prepTime ? cleanRecipeText(String(recipeObj.prepTime).replace(/^PT/, '').toLowerCase()) : '',
+              cookTime: recipeObj.cookTime || recipeObj.totalTime ? cleanRecipeText(String(recipeObj.cookTime || recipeObj.totalTime).replace(/^PT/, '').toLowerCase()) : '',
+              cuisine: recipeObj.recipeCuisine ? cleanRecipeText(Array.isArray(recipeObj.recipeCuisine) ? recipeObj.recipeCuisine.join(', ') : String(recipeObj.recipeCuisine)) : null,
+              mealCategory: recipeObj.recipeCategory ? cleanRecipeText(Array.isArray(recipeObj.recipeCategory) ? recipeObj.recipeCategory[0] : String(recipeObj.recipeCategory)).toLowerCase() : 'dinner',
+              tags,
+              imageUrl,
               sourceUrl: url,
-              ingredients: ingredients.length > 0 ? ingredients : [{ name: 'See recipe URL', amount: '', unit: '', aisleCategory: 'pantry' }],
+              ingredients: ingredients.length > 0 ? ingredients : [{ name: 'See recipe link', amount: '', unit: '', aisleCategory: 'pantry' }],
               instructions: instructions.filter(Boolean),
             },
           });
@@ -105,30 +150,33 @@ export async function POST(req: Request) {
           sourceUrl: url,
           ingredients: [],
           instructions: [],
+          imageUrl: ogImage,
         },
       });
     }
 
-    // Truncate HTML to save tokens
     const strippedText = html
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
-      .slice(0, 12000);
+      .slice(0, 14000);
 
-    const prompt = `Extract the recipe from this webpage text. Return JSON with this schema:
+    const prompt = `Extract the recipe from this webpage text. Return JSON with this exact schema:
     {
       "title": "Recipe Title",
       "servings": "4",
       "prepTime": "15 mins",
       "cookTime": "30 mins",
+      "cuisine": "Italian",
+      "mealCategory": "dinner",
+      "tags": ["Weeknight", "Comfort Food"],
       "ingredients": [
         { "name": "boneless chicken thighs", "amount": "1.5", "unit": "lbs", "aisleCategory": "meat" }
       ],
       "instructions": ["Step 1...", "Step 2..."]
     }
-    Valid aisleCategory values: produce, meat, dairy, pantry, spices, other.
+    Valid aisleCategory values: produce, meat, seafood, dairy, pantry, spices, bakery, other.
     
     Webpage text:
     ${strippedText}`;
@@ -140,15 +188,21 @@ export async function POST(req: Request) {
     await recordAiSpend(session.user.id, 'mise_url_parse', 0.005, prompt.length);
 
     const parsed = JSON.parse(textResponse);
+    const servingsStr = parsed.servings ? String(parsed.servings) : '4';
 
     return NextResponse.json({
       success: true,
       recipe: {
-        title: parsed.title || 'Imported Recipe',
-        servings: parsed.servings || '2-4',
+        title: cleanRecipeText(parsed.title || 'Imported Recipe'),
+        servings: cleanRecipeText(servingsStr),
+        servingsNum: parseQuantity(servingsStr) || 4.0,
         prepTime: parsed.prepTime || '',
         cookTime: parsed.cookTime || '',
+        cuisine: parsed.cuisine || null,
+        mealCategory: parsed.mealCategory || 'dinner',
+        tags: Array.isArray(parsed.tags) ? parsed.tags.join(', ') : parsed.tags || null,
         sourceUrl: url,
+        imageUrl: ogImage,
         ingredients: (parsed.ingredients || []).map((ing: any) => ({
           name: ing.name,
           amount: ing.amount || '',

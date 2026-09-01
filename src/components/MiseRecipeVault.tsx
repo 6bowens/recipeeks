@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   BookMarked,
   Plus,
@@ -15,85 +15,127 @@ import {
   Search,
   ChevronDown,
   X,
-  FileText,
-  Eye,
+  Star,
+  Play,
+  Flame,
+  Filter,
+  ChefHat,
+  Calendar,
+  Layers,
 } from 'lucide-react';
 import { FREQUENCY_CONFIG } from '@/lib/playlist-utils';
 import { MiseRecipeDetailModal } from '@/components/MiseRecipeDetailModal';
-import { MiseGoogleNotesModal } from '@/components/MiseGoogleNotesModal';
+import { MiseUniversalImportModal } from '@/components/MiseUniversalImportModal';
 
 interface MiseRecipeVaultProps {
   recipes: any[];
   onRefresh: () => void;
+  onAddToPlatelist?: (recipeId: string) => void;
 }
 
-export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
+export function MiseRecipeVault({
+  recipes,
+  onRefresh,
+  onAddToPlatelist,
+}: MiseRecipeVaultProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedFrequencyFilter, setSelectedFrequencyFilter] = useState<string>('all');
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showNotesModal, setShowNotesModal] = useState(false);
   const [selectedRecipeForDetail, setSelectedRecipeForDetail] = useState<any | null>(null);
 
-  // Add Modal Form State
-  const [addMode, setAddMode] = useState<'ai' | 'url' | 'manual'>('ai');
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiServings, setAiServings] = useState('4');
-  const [aiCookTime, setAiCookTime] = useState('');
-  const [aiGenerating, setAiGenerating] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [urlInput, setUrlInput] = useState('');
-  const [urlParsing, setUrlParsing] = useState(false);
-  const [manualTitle, setManualTitle] = useState('');
-  const [manualCookTime, setManualCookTime] = useState('30 mins');
-  const [manualServings, setManualServings] = useState('2-4');
-  const [manualFrequency, setManualFrequency] = useState('1_week');
-  const [manualIngredientsText, setManualIngredientsText] = useState('');
-  const [manualInstructionsText, setManualInstructionsText] = useState('');
-  const [manualNotes, setManualNotes] = useState('');
-  const [savingRecipe, setSavingRecipe] = useState(false);
+  // Extract all unique tags
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    recipes.forEach((r) => {
+      if (r.tagsList && Array.isArray(r.tagsList)) {
+        r.tagsList.forEach((t: string) => set.add(t));
+      } else if (r.tags) {
+        r.tags.split(',').forEach((t: string) => set.add(t.trim()));
+      }
+    });
+    return Array.from(set).filter(Boolean);
+  }, [recipes]);
 
-  const handleGenerateAiRecipe = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!aiPrompt.trim()) return;
+  // Filter recipes
+  const filteredRecipes = useMemo(() => {
+    return recipes.filter((r) => {
+      // Category filter
+      if (selectedCategory !== 'all') {
+        if ((r.mealCategory || 'dinner').toLowerCase() !== selectedCategory.toLowerCase()) {
+          return false;
+        }
+      }
 
+      // Frequency filter
+      if (selectedFrequencyFilter !== 'all') {
+        if (r.frequency !== selectedFrequencyFilter) return false;
+      }
+
+      // Favorites filter
+      if (showOnlyFavorites && !r.isFavorite) {
+        return false;
+      }
+
+      // Tag filter
+      if (selectedTag) {
+        const tags = r.tagsList || (r.tags ? r.tags.split(',').map((t: string) => t.trim()) : []);
+        if (!tags.some((t: string) => t.toLowerCase() === selectedTag.toLowerCase())) {
+          return false;
+        }
+      }
+
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const titleMatch = r.title?.toLowerCase().includes(q);
+        const notesMatch = r.notes?.toLowerCase().includes(q);
+        const cuisineMatch = r.cuisine?.toLowerCase().includes(q);
+        const tagsMatch = (r.tagsList || []).some((t: string) => t.toLowerCase().includes(q));
+        const ingMatch = (r.ingredients || []).some((i: any) => i.name.toLowerCase().includes(q));
+        if (!titleMatch && !notesMatch && !cuisineMatch && !tagsMatch && !ingMatch) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [recipes, selectedCategory, selectedFrequencyFilter, showOnlyFavorites, selectedTag, searchQuery]);
+
+  const favoritesCount = recipes.filter((r) => r.isFavorite).length;
+
+  const handleToggleFavorite = async (recipe: any, e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
-      setAiGenerating(true);
-      const res = await fetch('/api/mise/generate-recipe', {
+      const res = await fetch('/api/favorites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: aiPrompt.trim(),
-          servings: aiServings,
-          cookTime: aiCookTime || undefined,
+          type: 'recipe',
+          title: recipe.title,
+          customRecipeId: recipe.id,
+          sourceType: 'custom',
         }),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to generate recipe');
-      }
-
       const data = await res.json();
-      if (data.recipe) {
-        setManualTitle(data.recipe.title);
-        setManualCookTime(data.recipe.cookTime || '30 mins');
-        setManualServings(data.recipe.servings || '4');
-        setManualNotes(data.recipe.notes || '');
-        setManualInstructionsText((data.recipe.instructions || []).join('\n'));
-        const ingLines = (data.recipe.ingredients || [])
-          .map((i: any) => [i.amount, i.unit, i.name].filter(Boolean).join(' '))
-          .join('\n');
-        setManualIngredientsText(ingLines);
-        setAddMode('manual'); // Seamlessly transition to review & save
+      if (res.ok) {
+        setToastMessage(data.favorited ? `★ Added "${recipe.title}" to Favourites!` : `Removed "${recipe.title}" from Favourites`);
+        setTimeout(() => setToastMessage(null), 3000);
+        onRefresh();
       }
     } catch (err) {
-      alert((err as Error).message);
-    } finally {
-      setAiGenerating(false);
+      console.error(err);
     }
   };
 
-  const handleUpdateFrequency = async (recipeId: string, frequency: string) => {
+  const handleUpdateFrequency = async (recipeId: string, frequency: string, e: React.ChangeEvent<HTMLSelectElement>) => {
+    e.stopPropagation();
     try {
       const res = await fetch('/api/mise/recipes', {
         method: 'PATCH',
@@ -108,10 +150,9 @@ export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
     }
   };
 
-  const handleDeleteRecipe = async (recipeId: string, title: string) => {
-    if (!confirm(`Are you sure you want to remove "${title}" from your Mise vault?`)) {
-      return;
-    }
+  const handleDeleteRecipe = async (recipeId: string, title: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Are you sure you want to delete "${title}" from your recipe vault?`)) return;
 
     try {
       const res = await fetch(`/api/mise/recipes?id=${recipeId}`, {
@@ -125,592 +166,316 @@ export function MiseRecipeVault({ recipes, onRefresh }: MiseRecipeVaultProps) {
     }
   };
 
-  const handleParseUrl = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!urlInput.trim()) return;
-
-    try {
-      setUrlParsing(true);
-      const res = await fetch('/api/mise/parse-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: urlInput.trim(),
-          frequency: manualFrequency,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to import recipe from URL');
-      }
-
-      setUrlInput('');
-      setShowAddModal(false);
-      onRefresh();
-    } catch (err) {
-      alert((err as Error).message);
-    } finally {
-      setUrlParsing(false);
-    }
-  };
-
-  const handleManualSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualTitle.trim()) return;
-
-    try {
-      setSavingRecipe(true);
-      const ingredients = manualIngredientsText
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .map((line) => ({ name: line }));
-
-      const res = await fetch('/api/mise/recipes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: manualTitle.trim(),
-          cookTime: manualCookTime.trim() || undefined,
-          servings: manualServings.trim() || undefined,
-          frequency: manualFrequency,
-          ingredients,
-          instructions: manualInstructionsText.trim() || undefined,
-          notes: manualNotes.trim() || undefined,
-          sourceType: 'manual',
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to save recipe');
-      }
-
-      setManualTitle('');
-      setManualIngredientsText('');
-      setManualInstructionsText('');
-      setManualNotes('');
-      setShowAddModal(false);
-      onRefresh();
-    } catch (err) {
-      alert((err as Error).message);
-    } finally {
-      setSavingRecipe(false);
-    }
-  };
-
-  const filteredRecipes = recipes.filter((r) => {
-    const matchesSearch =
-      r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (r.ingredients || []).some((i: any) =>
-        i.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-
-    const matchesFreq =
-      selectedFrequencyFilter === 'all' || r.frequency === selectedFrequencyFilter;
-
-    return matchesSearch && matchesFreq;
-  });
-
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-[#120d1f] via-[#1a122c] to-[#120d1f] rounded-3xl p-5 sm:p-7 border border-purple-900/30 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
-              Recipe Vault
-            </span>
-            <span className="text-xs text-purple-300/70 font-mono">
-              {recipes.length} total saved recipes
-            </span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-serif font-bold text-white leading-tight">
-            Recipe Repository & Cadence
-          </h2>
-          <p className="text-xs text-purple-200/60 mt-0.5">
-            Set how frequently you want each dish to appear in your dinner rotation.
-          </p>
-        </div>
-
-        {/* Action Buttons: Google Notes & Add Recipe */}
-        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-between sm:justify-end">
-          <button
-            onClick={() => setShowNotesModal(true)}
-            className="px-4 py-3 bg-gradient-to-r from-purple-600/30 to-fuchsia-600/30 hover:from-purple-600/50 hover:to-fuchsia-600/50 border border-purple-500/40 text-purple-200 hover:text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
-            title="Paste notes or text to automatically extract and import recipes"
-          >
-            <Sparkles className="w-4 h-4 text-purple-400" />
-            <span>Paste & Scan Notes</span>
-          </button>
-
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-5 py-3 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-600 hover:from-purple-500 hover:to-purple-400 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95 shrink-0"
-          >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Add Recipe</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-72">
-          <Search className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400/50" />
-          <input
-            type="text"
-            placeholder="Search vault recipes or ingredients..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#140f20] border border-purple-900/30 text-white rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-purple-500 placeholder:text-purple-300/40"
-          />
-        </div>
-
-        {/* Frequency Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 scrollbar-none">
-          <button
-            onClick={() => setSelectedFrequencyFilter('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 cursor-pointer transition-all ${
-              selectedFrequencyFilter === 'all'
-                ? 'bg-purple-600 text-white font-bold'
-                : 'bg-[#140f20] text-purple-200/60 hover:text-white border border-white/5'
-            }`}
-          >
-            All ({recipes.length})
-          </button>
-          {Object.entries(FREQUENCY_CONFIG).map(([k, meta]) => {
-            const count = recipes.filter((r) => r.frequency === k).length;
-            return (
-              <button
-                key={k}
-                onClick={() => setSelectedFrequencyFilter(k)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 cursor-pointer transition-all ${
-                  selectedFrequencyFilter === k
-                    ? 'bg-purple-600 text-white font-bold'
-                    : 'bg-[#140f20] text-purple-200/60 hover:text-white border border-white/5'
-                }`}
-              >
-                {meta.shortLabel} ({count})
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Recipes Grid */}
-      {filteredRecipes.length === 0 ? (
-        <div className="bg-[#140f20] border border-purple-900/30 rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-xl">
-          <BookMarked className="w-12 h-12 mx-auto text-purple-500/40" />
-          <h3 className="text-lg font-bold text-white">No Recipes Found</h3>
-          <p className="text-xs text-purple-200/70 max-w-sm mx-auto">
-            {searchQuery
-              ? `No recipes matching "${searchQuery}". Try a different term or clear the search.`
-              : 'Add your favorite dishes via URL, pasted recipe text, or from your Recipeeks cookbooks.'}
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredRecipes.map((recipe) => (
-            <div
-              key={recipe.id}
-              onClick={() => setSelectedRecipeForDetail(recipe)}
-              className="bg-[#140f20] rounded-3xl border border-purple-900/30 p-5 shadow-xl space-y-4 hover:border-purple-500/50 transition-all flex flex-col justify-between cursor-pointer group"
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  {recipe.sourceType === 'cookbook' ? (
-                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
-                      <BookOpen className="w-2.5 h-2.5" /> {recipe.cookbookTitle || 'Cookbook'}
-                    </span>
-                  ) : recipe.sourceType === 'url' ? (
-                    <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
-                      <span>Web</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </span>
-                  ) : (
-                    <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
-                      Manual
-                    </span>
-                  )}
-
-                  <span className="text-[11px] text-purple-400 font-mono">
-                    {(recipe.ingredients || []).length} ingr.
-                  </span>
-                </div>
-
-                <h3 className="text-lg font-serif font-bold text-white group-hover:text-purple-200 transition-colors line-clamp-1">
-                  {recipe.title}
-                </h3>
-
-                <p className="text-xs text-purple-200/60 line-clamp-2 leading-relaxed">
-                  {(recipe.ingredients || []).map((i: any) => i.name).join(', ') || 'No ingredients listed'}
-                </p>
-              </div>
-
-              {/* Bottom Frequency Selector & Delete */}
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="pt-3 border-t border-white/5 flex items-center justify-between gap-2"
-              >
-                <select
-                  value={recipe.frequency}
-                  onChange={(e) => handleUpdateFrequency(recipe.id, e.target.value)}
-                  className="bg-[#0b0813] border border-purple-800/40 text-purple-200 text-xs font-semibold rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-purple-500 cursor-pointer min-w-[130px]"
-                >
-                  {Object.entries(FREQUENCY_CONFIG).map(([k, meta]) => (
-                    <option key={k} value={k}>
-                      {meta.label}
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  onClick={() => handleDeleteRecipe(recipe.id, recipe.title)}
-                  className="p-1.5 text-purple-400/40 hover:text-red-400 rounded-lg transition-colors cursor-pointer"
-                  title="Delete from vault"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Toast */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-charcoal-900 border border-purple-500 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold animate-in fade-in slide-in-from-bottom-3">
+          <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+          <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* FULL RECIPE DETAIL MODAL */}
+      {/* Hero Banner */}
+      <div className="bg-gradient-to-r from-[#1b1028] via-[#140b20] to-[#24102d] border border-purple-900/40 rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="space-y-1.5 max-w-2xl">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="bg-purple-500/20 border border-purple-400/40 text-purple-300 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full flex items-center gap-1.5 font-mono">
+              <ChefHat className="w-3.5 h-3.5 text-purple-400" /> Mise Culinary Hub
+            </span>
+          </div>
+
+          <h1 className="text-2xl sm:text-4xl font-serif font-bold text-white leading-tight">
+            Recipe Collection
+          </h1>
+          <p className="text-xs sm:text-sm text-purple-200/70 leading-relaxed">
+            Your personal digital cookbook. Host, scale, and cook home recipes with hands-free step timers and seamless meal rotation.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="px-6 py-3.5 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-600 hover:from-purple-500 hover:to-fuchsia-500 text-white rounded-2xl font-extrabold text-xs sm:text-sm flex items-center gap-2 shadow-xl hover:shadow-purple-500/25 transition-all hover:scale-105 active:scale-95 shrink-0 cursor-pointer"
+        >
+          <Plus className="w-4 h-4 stroke-[3]" />
+          <span>+ Add Recipe</span>
+        </button>
+      </div>
+
+      {/* Search & Filter Toolbar */}
+      <div className="bg-[#120a1f] border border-purple-900/40 rounded-2xl p-4 space-y-3.5 shadow-lg">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Search Bar */}
+          <div className="relative flex-1 max-w-lg">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400/50" />
+            <input
+              type="text"
+              placeholder="Search recipes, ingredients, cuisines, or tags..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#0d0718] border border-purple-900/50 text-white rounded-xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:border-purple-500 placeholder:text-purple-300/40 shadow-inner"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Category Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+            {[
+              { id: 'all', label: 'All Recipes' },
+              { id: 'dinner', label: 'Dinner' },
+              { id: 'lunch', label: 'Lunch' },
+              { id: 'breakfast', label: 'Breakfast' },
+              { id: 'side', label: 'Sides & Salads' },
+              { id: 'dessert', label: 'Desserts' },
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  selectedCategory === cat.id
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-white/5 text-purple-300/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+
+            {/* Star Favourites Pill */}
+            <button
+              onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                showOnlyFavorites
+                  ? 'bg-amber-500 text-charcoal-950 shadow-md font-extrabold'
+                  : 'bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+              }`}
+            >
+              <Star className={`w-3.5 h-3.5 ${showOnlyFavorites ? 'fill-charcoal-950' : 'fill-amber-400'}`} />
+              <span>Favourites ({favoritesCount})</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Sub-Filters: Frequency & Tags */}
+        <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-purple-900/30 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-purple-400 font-mono flex items-center gap-1">
+              <Filter className="w-3 h-3" /> Platelist Frequency:
+            </span>
+            <select
+              value={selectedFrequencyFilter}
+              onChange={(e) => setSelectedFrequencyFilter(e.target.value)}
+              className="bg-[#0d0718] border border-purple-900/50 rounded-lg px-2.5 py-1 text-xs text-purple-200 focus:outline-none focus:border-purple-500 font-medium cursor-pointer"
+            >
+              <option value="all">All Frequencies</option>
+              {Object.entries(FREQUENCY_CONFIG).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Tag chips */}
+            {allTags.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap ml-2">
+                {allTags.slice(0, 6).map((tag) => {
+                  const isSelected = selectedTag?.toLowerCase() === tag.toLowerCase();
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => setSelectedTag(isSelected ? null : tag)}
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-fuchsia-600 text-white font-bold'
+                          : 'bg-white/5 hover:bg-white/10 text-purple-300/70 border border-purple-500/20'
+                      }`}
+                    >
+                      #{tag}
+                    </button>
+                  );
+                })}
+                {selectedTag && (
+                  <button
+                    onClick={() => setSelectedTag(null)}
+                    className="text-[10px] text-red-400 hover:text-red-300 underline font-mono ml-1 cursor-pointer"
+                  >
+                    Clear Tag
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="text-xs text-purple-300/60 font-mono">
+            Showing <strong>{filteredRecipes.length}</strong> of {recipes.length} recipes
+          </div>
+        </div>
+      </div>
+
+      {/* Recipe Cards Grid */}
+      {filteredRecipes.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {filteredRecipes.map((recipe) => {
+            const ingredientsCount = (recipe.ingredients || []).length;
+            const isFav = !!recipe.isFavorite;
+
+            return (
+              <div
+                key={recipe.id}
+                onClick={() => setSelectedRecipeForDetail(recipe)}
+                className="group bg-[#140c1f] hover:bg-[#180e26] border border-purple-900/40 hover:border-purple-500/50 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1 cursor-pointer flex flex-col justify-between space-y-4 relative overflow-hidden"
+              >
+                {/* Accent top gradient */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-fuchsia-500 to-amber-500 opacity-60 group-hover:opacity-100 transition-opacity" />
+
+                {/* Top Row: Category & Star */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {recipe.mealCategory && (
+                      <span className="bg-purple-500/20 border border-purple-400/40 text-purple-300 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full font-mono">
+                        {recipe.mealCategory}
+                      </span>
+                    )}
+                    {recipe.cuisine && (
+                      <span className="bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-300 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full font-mono">
+                        {recipe.cuisine}
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={(e) => handleToggleFavorite(recipe, e)}
+                    className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                      isFav
+                        ? 'bg-amber-500/20 border-amber-400/50 text-amber-400'
+                        : 'bg-white/5 border-white/10 hover:bg-white/15 text-charcoal-400 hover:text-amber-300'
+                    }`}
+                    title={isFav ? 'Remove from Favourites' : 'Add to Favourites'}
+                  >
+                    <Star className={`w-3.5 h-3.5 ${isFav ? 'fill-amber-400' : ''}`} />
+                  </button>
+                </div>
+
+                {/* Title & Notes */}
+                <div className="space-y-1.5 flex-1">
+                  <h3 className="font-serif font-bold text-lg sm:text-xl text-white group-hover:text-purple-200 transition-colors line-clamp-2 leading-snug">
+                    {recipe.title}
+                  </h3>
+                  {recipe.notes && (
+                    <p className="text-xs text-purple-200/60 line-clamp-2 leading-relaxed">
+                      {recipe.notes}
+                    </p>
+                  )}
+                </div>
+
+                {/* Meta Row: Cook time, servings, ingredients */}
+                <div className="flex items-center gap-3 text-xs text-purple-300/70 pt-2 border-t border-purple-900/30 flex-wrap">
+                  {recipe.cookTime && (
+                    <div className="flex items-center gap-1 font-mono">
+                      <Clock className="w-3.5 h-3.5 text-purple-400" />
+                      <span>{recipe.cookTime}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1 font-mono">
+                    <Users className="w-3.5 h-3.5 text-purple-400" />
+                    <span>{recipe.servings || '4'} servings</span>
+                  </div>
+                  <div className="flex items-center gap-1 font-mono text-[11px] text-purple-400/80">
+                    <span>{ingredientsCount} ingredients</span>
+                  </div>
+                </div>
+
+                {/* Bottom Controls: Frequency Dropdown & Quick Actions */}
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center justify-between gap-2 pt-2 border-t border-purple-900/30"
+                >
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={recipe.frequency || '1_week'}
+                      onChange={(e) => handleUpdateFrequency(recipe.id, e.target.value, e)}
+                      className="bg-[#0d0718] border border-purple-900/50 rounded-lg px-2 py-1 text-[11px] text-purple-200 focus:outline-none focus:border-purple-500 font-mono font-bold cursor-pointer"
+                      title="Set dinner rotation frequency"
+                    >
+                      {Object.entries(FREQUENCY_CONFIG).map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedRecipeForDetail(recipe);
+                      }}
+                      className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-md transition-all cursor-pointer active:scale-95"
+                    >
+                      <Play className="w-3 h-3 fill-current" />
+                      <span>Cook</span>
+                    </button>
+
+                    <button
+                      onClick={(e) => handleDeleteRecipe(recipe.id, recipe.title, e)}
+                      className="p-1.5 rounded-lg text-charcoal-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      title="Delete recipe"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Empty State */
+        <div className="bg-[#140c1f] border border-purple-900/40 rounded-3xl p-12 text-center space-y-4 max-w-lg mx-auto">
+          <div className="w-16 h-16 rounded-2xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-400 mx-auto">
+            <BookMarked className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-serif font-bold text-lg text-white">No Recipes Found</h3>
+            <p className="text-xs text-purple-300/60 leading-relaxed">
+              {searchQuery || selectedCategory !== 'all' || selectedTag
+                ? 'Try adjusting your search query or filters.'
+                : 'Your recipe vault is empty. Add your favorite dinners via URL, AI Chef, or Photo OCR!'}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Your First Recipe</span>
+          </button>
+        </div>
+      )}
+
+      {/* Universal Import Modal */}
+      <MiseUniversalImportModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={onRefresh}
+      />
+
+      {/* Recipe Detail Modal */}
       {selectedRecipeForDetail && (
         <MiseRecipeDetailModal
           recipe={selectedRecipeForDetail}
           onClose={() => setSelectedRecipeForDetail(null)}
-          onPantryChange={onRefresh}
-          onFrequencyChange={(id, freq) => {
-            handleUpdateFrequency(id, freq);
-            setSelectedRecipeForDetail((prev: any) => (prev ? { ...prev, frequency: freq } : null));
-          }}
-          onDelete={(id, title) => {
-            handleDeleteRecipe(id, title);
-            setSelectedRecipeForDetail(null);
-          }}
-          onSaveRecipe={(updated) => {
-            setSelectedRecipeForDetail(updated);
-            onRefresh();
-          }}
+          onRefresh={onRefresh}
+          onAddToPlatelist={onAddToPlatelist}
         />
-      )}
-
-      {/* GOOGLE NOTES SCANNER MODAL */}
-      {showNotesModal && (
-        <MiseGoogleNotesModal
-          onClose={() => setShowNotesModal(false)}
-          onImportSuccess={onRefresh}
-        />
-      )}
-
-      {/* ADD RECIPE MODAL (URL & MANUAL) */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-[#140f20] border border-purple-900/40 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6">
-            <div className="flex items-center justify-between pb-3 border-b border-white/5">
-              <h3 className="text-xl font-serif font-bold text-white">Add Recipe to Vault</h3>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-purple-300/60 hover:text-white p-1 rounded-xl cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Mode Switcher Tabs */}
-            <div className="bg-[#0b0813] p-1 rounded-xl flex items-center gap-1 text-xs">
-              <button
-                onClick={() => setAddMode('ai')}
-                className={`flex-1 py-2 rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  addMode === 'ai' ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md' : 'text-purple-300/60 hover:text-white'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>AI Generator</span>
-              </button>
-              <button
-                onClick={() => setAddMode('url')}
-                className={`flex-1 py-2 rounded-lg font-bold transition-all cursor-pointer ${
-                  addMode === 'url' ? 'bg-purple-600 text-white' : 'text-purple-300/60 hover:text-white'
-                }`}
-              >
-                Web URL
-              </button>
-              <button
-                onClick={() => setAddMode('manual')}
-                className={`flex-1 py-2 rounded-lg font-bold transition-all cursor-pointer ${
-                  addMode === 'manual' ? 'bg-purple-600 text-white' : 'text-purple-300/60 hover:text-white'
-                }`}
-              >
-                Manual
-              </button>
-            </div>
-
-            {addMode === 'ai' ? (
-              <form onSubmit={handleGenerateAiRecipe} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                    Describe Dish or Ingredients
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="e.g. chicken thighs + veg, creamy lemon garlic salmon, 15-min spicy noodle bowl..."
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                    required
-                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl p-3 text-xs focus:outline-none focus:border-purple-500 leading-relaxed"
-                  />
-                </div>
-
-                {/* Quick Suggestion Chips */}
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-purple-400/70 uppercase tracking-wider font-mono">
-                    Quick Ideas
-                  </span>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {[
-                      '🍗 Chicken thighs + veg',
-                      '🍝 Creamy lemon garlic pasta',
-                      '🌮 Crispy carnitas tacos',
-                      '🥩 Steak & blistered peppers',
-                      '🍲 Hearty white bean stew',
-                    ].map((chip, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setAiPrompt(chip.replace(/^[^a-zA-Z0-9]+/, ''))}
-                        className="bg-white/5 hover:bg-purple-500/20 border border-white/5 hover:border-purple-500/40 text-purple-200 text-[11px] px-2.5 py-1 rounded-lg transition-all cursor-pointer"
-                      >
-                        {chip}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-purple-300 font-mono mb-1">
-                      Servings
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 4"
-                      value={aiServings}
-                      onChange={(e) => setAiServings(e.target.value)}
-                      className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-purple-300 font-mono mb-1">
-                      Cook Time (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 30 mins"
-                      value={aiCookTime}
-                      onChange={(e) => setAiCookTime(e.target.value)}
-                      className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                    Rotation Cadence
-                  </label>
-                  <select
-                    value={manualFrequency}
-                    onChange={(e) => setManualFrequency(e.target.value)}
-                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
-                  >
-                    {Object.entries(FREQUENCY_CONFIG).map(([k, meta]) => (
-                      <option key={k} value={k}>
-                        {meta.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="pt-2 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 text-xs font-bold text-purple-300/60 hover:text-white cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={aiGenerating || !aiPrompt.trim()}
-                    className="px-6 py-2.5 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-600 hover:from-purple-500 hover:to-purple-400 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
-                  >
-                    <Sparkles className={`w-3.5 h-3.5 ${aiGenerating ? 'animate-spin' : ''}`} />
-                    <span>{aiGenerating ? 'Creating Recipe...' : 'Generate Recipe'}</span>
-                  </button>
-                </div>
-              </form>
-            ) : addMode === 'url' ? (
-              <form onSubmit={handleParseUrl} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                    Recipe Web URL
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://cooking.nytimes.com/recipes/..."
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    required
-                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                    Rotation Cadence
-                  </label>
-                  <select
-                    value={manualFrequency}
-                    onChange={(e) => setManualFrequency(e.target.value)}
-                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
-                  >
-                    {Object.entries(FREQUENCY_CONFIG).map(([k, meta]) => (
-                      <option key={k} value={k}>
-                        {meta.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="pt-2 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 text-xs font-bold text-purple-300/60 hover:text-white cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={urlParsing || !urlInput.trim()}
-                    className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-1.5 cursor-pointer transition-all"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>{urlParsing ? 'Extracting Recipe...' : 'Import Recipe'}</span>
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <form onSubmit={handleManualSave} className="space-y-4 max-h-96 overflow-y-auto pr-1">
-                <div>
-                  <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                    Recipe Title *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Crispy Skillet Chicken Thighs"
-                    value={manualTitle}
-                    onChange={(e) => setManualTitle(e.target.value)}
-                    required
-                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                      Cook Time
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 35 mins"
-                      value={manualCookTime}
-                      onChange={(e) => setManualCookTime(e.target.value)}
-                      className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                      Servings
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 4 servings"
-                      value={manualServings}
-                      onChange={(e) => setManualServings(e.target.value)}
-                      className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                    Rotation Frequency
-                  </label>
-                  <select
-                    value={manualFrequency}
-                    onChange={(e) => setManualFrequency(e.target.value)}
-                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
-                  >
-                    {Object.entries(FREQUENCY_CONFIG).map(([k, meta]) => (
-                      <option key={k} value={k}>
-                        {meta.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                    Ingredients (1 per line)
-                  </label>
-                  <textarea
-                    rows={4}
-                    placeholder="2 lbs chicken thighs&#10;1 tbsp olive oil&#10;1 tsp smoked paprika&#10;2 cloves garlic"
-                    value={manualIngredientsText}
-                    onChange={(e) => setManualIngredientsText(e.target.value)}
-                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-purple-500 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-purple-300 font-mono mb-1">
-                    Instructions / Method (Optional)
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Sear chicken on high heat for 6 mins per side..."
-                    value={manualInstructionsText}
-                    onChange={(e) => setManualInstructionsText(e.target.value)}
-                    className="w-full bg-[#0b0813] border border-purple-900/40 text-white rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-purple-500"
-                  />
-                </div>
-
-                <div className="pt-2 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 text-xs font-bold text-purple-300/60 hover:text-white cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingRecipe || !manualTitle.trim()}
-                    className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white text-xs font-bold rounded-xl shadow-lg cursor-pointer transition-all"
-                  >
-                    <span>{savingRecipe ? 'Saving...' : 'Save Recipe'}</span>
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
       )}
     </div>
   );

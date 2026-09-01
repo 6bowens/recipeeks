@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { normalizeIngredientName } from '@/lib/utils';
 import { deduceAisleCategory, cleanRecipeText, parseIngredientLine } from '@/lib/playlist-utils';
+import { parseQuantity } from '@/lib/recipe-scaling';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,40 +15,86 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const userId = session.user.id;
+    const { searchParams } = new URL(req.url);
+    const q = searchParams.get('q')?.toLowerCase().trim();
+    const mealCategory = searchParams.get('category');
+    const frequency = searchParams.get('frequency');
+    const tag = searchParams.get('tag')?.toLowerCase().trim();
+    const favoritesOnly = searchParams.get('favoritesOnly') === 'true';
+
     const recipes = await db.customRecipe.findMany({
-      where: { userId: session.user.id },
-      include: { ingredients: true },
+      where: {
+        userId,
+        ...(mealCategory && mealCategory !== 'all' ? { mealCategory } : {}),
+        ...(frequency && frequency !== 'all' ? { frequency } : {}),
+      },
+      include: {
+        ingredients: true,
+        favorites: {
+          where: { userId },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
-    // Clean up any weird bullet characters and parse amounts if needed
-    const cleanedRecipes = recipes.map((r) => ({
-      ...r,
-      title: cleanRecipeText(r.title),
-      notes: r.notes ? cleanRecipeText(r.notes) : null,
-      ingredients: (r.ingredients || []).map((i) => {
-        let name = cleanRecipeText(i.name);
-        let amount = i.amount ? cleanRecipeText(i.amount) : null;
-        let unit = i.unit ? cleanRecipeText(i.unit) : null;
+    let cleanedRecipes = recipes.map((r) => {
+      const isFavorite = (r.favorites && r.favorites.length > 0);
+      const tagsList = r.tags
+        ? r.tags.split(',').map((t) => t.trim()).filter(Boolean)
+        : [];
 
-        // If amount was not parsed originally and name has embedded quantity/units
-        if (!amount && name) {
-          const parsed = parseIngredientLine(name);
-          if (parsed.amount) {
-            amount = parsed.amount;
-            unit = parsed.unit || null;
-            name = parsed.name;
+      return {
+        ...r,
+        title: cleanRecipeText(r.title),
+        notes: r.notes ? cleanRecipeText(r.notes) : null,
+        tagsList,
+        isFavorite,
+        ingredients: (r.ingredients || []).map((i) => {
+          let name = cleanRecipeText(i.name);
+          let amount = i.amount ? cleanRecipeText(i.amount) : null;
+          let unit = i.unit ? cleanRecipeText(i.unit) : null;
+
+          if (!amount && name) {
+            const parsed = parseIngredientLine(name);
+            if (parsed.amount) {
+              amount = parsed.amount;
+              unit = parsed.unit || null;
+              name = parsed.name;
+            }
           }
-        }
 
-        return {
-          ...i,
-          name,
-          amount,
-          unit,
-        };
-      }),
-    }));
+          return {
+            ...i,
+            name,
+            amount,
+            unit,
+          };
+        }),
+      };
+    });
+
+    // In-memory filter for search query and tag
+    if (q) {
+      cleanedRecipes = cleanedRecipes.filter((r) => {
+        const titleMatch = r.title.toLowerCase().includes(q);
+        const notesMatch = r.notes?.toLowerCase().includes(q);
+        const cuisineMatch = r.cuisine?.toLowerCase().includes(q);
+        const tagMatch = r.tagsList.some((t: string) => t.toLowerCase().includes(q));
+        const ingMatch = r.ingredients.some((i: any) => i.name.toLowerCase().includes(q));
+        return titleMatch || notesMatch || cuisineMatch || tagMatch || ingMatch;
+      });
+    }
+
+    if (tag) {
+      cleanedRecipes = cleanedRecipes.filter((r) =>
+        r.tagsList.some((t: string) => t.toLowerCase() === tag)
+      );
+    }
+
+    if (favoritesOnly) {
+      cleanedRecipes = cleanedRecipes.filter((r) => r.isFavorite);
+    }
 
     return NextResponse.json({
       success: true,
@@ -78,9 +125,15 @@ export async function POST(req: Request) {
       cookbookTitle,
       pageNumber,
       frequency = '1_week',
-      servings = '2-4',
+      servings = '4',
+      servingsNum,
       prepTime,
       cookTime,
+      tags,
+      cuisine,
+      mealCategory = 'dinner',
+      rating = 5.0,
+      imageUrl,
       instructions,
       notes,
       ingredients = [],
@@ -98,6 +151,8 @@ export async function POST(req: Request) {
         ? JSON.stringify(instructions.map((step: any) => cleanRecipeText(typeof step === 'string' ? step : '')))
         : null;
 
+    const numericServings = servingsNum || parseQuantity(servings) || 4.0;
+
     const created = await db.customRecipe.create({
       data: {
         title: cleanedTitle,
@@ -106,9 +161,15 @@ export async function POST(req: Request) {
         cookbookTitle: cookbookTitle ? cleanRecipeText(cookbookTitle) : null,
         pageNumber: pageNumber ? parseInt(String(pageNumber)) : null,
         frequency,
-        servings: servings ? cleanRecipeText(String(servings)) : '2-4',
+        servings: servings ? cleanRecipeText(String(servings)) : '4',
+        servingsNum: numericServings,
         prepTime: prepTime ? cleanRecipeText(String(prepTime)) : null,
         cookTime: cookTime ? cleanRecipeText(String(cookTime)) : null,
+        tags: tags ? (Array.isArray(tags) ? tags.join(', ') : cleanRecipeText(String(tags))) : null,
+        cuisine: cuisine ? cleanRecipeText(String(cuisine)) : null,
+        mealCategory: mealCategory ? cleanRecipeText(String(mealCategory)) : 'dinner',
+        rating: rating !== undefined ? parseFloat(String(rating)) : 5.0,
+        imageUrl: imageUrl || null,
         instructions: formattedInstructions,
         notes: notes ? cleanRecipeText(notes) : null,
         userId: session.user.id,
@@ -123,7 +184,6 @@ export async function POST(req: Request) {
               let unit = ing.unit ? cleanRecipeText(String(ing.unit)) : null;
               let aisleCategory = ing.aisleCategory || null;
 
-              // If amount/unit was not explicitly separated, parse it from rawName
               if (!amount) {
                 const parsed = parseIngredientLine(rawName);
                 if (parsed.amount) {
@@ -177,7 +237,22 @@ export async function PATCH(req: Request) {
 
     const userId = session.user.id;
     const body = await req.json();
-    const { id, frequency, title, servings, prepTime, cookTime, notes, instructions } = body;
+    const {
+      id,
+      frequency,
+      title,
+      servings,
+      servingsNum,
+      prepTime,
+      cookTime,
+      tags,
+      cuisine,
+      mealCategory,
+      rating,
+      imageUrl,
+      notes,
+      instructions,
+    } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Recipe ID is required' }, { status: 400 });
@@ -189,8 +264,14 @@ export async function PATCH(req: Request) {
         ...(frequency !== undefined ? { frequency } : {}),
         ...(title !== undefined ? { title: cleanRecipeText(title) } : {}),
         ...(servings !== undefined ? { servings: cleanRecipeText(servings) } : {}),
+        ...(servingsNum !== undefined ? { servingsNum: parseFloat(String(servingsNum)) } : {}),
         ...(prepTime !== undefined ? { prepTime: cleanRecipeText(prepTime) } : {}),
         ...(cookTime !== undefined ? { cookTime: cleanRecipeText(cookTime) } : {}),
+        ...(tags !== undefined ? { tags: Array.isArray(tags) ? tags.join(', ') : cleanRecipeText(tags) } : {}),
+        ...(cuisine !== undefined ? { cuisine: cleanRecipeText(cuisine) } : {}),
+        ...(mealCategory !== undefined ? { mealCategory: cleanRecipeText(mealCategory) } : {}),
+        ...(rating !== undefined ? { rating: parseFloat(String(rating)) } : {}),
+        ...(imageUrl !== undefined ? { imageUrl } : {}),
         ...(notes !== undefined ? { notes: cleanRecipeText(notes) } : {}),
         ...(instructions !== undefined
           ? {
@@ -253,7 +334,6 @@ export async function PATCH(req: Request) {
       }
     }
 
-    // If recipe was set to paused (0x), immediately check active playlist and swap it out if present
     if (frequency === 'paused') {
       const activePlaylist = await db.mealPlaylist.findFirst({
         where: { userId, active: true },
@@ -296,7 +376,10 @@ export async function PATCH(req: Request) {
 
     const fullUpdatedRecipe = await db.customRecipe.findUnique({
       where: { id },
-      include: { ingredients: true },
+      include: {
+        ingredients: true,
+        favorites: { where: { userId } },
+      },
     });
 
     return NextResponse.json({

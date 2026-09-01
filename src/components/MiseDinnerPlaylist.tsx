@@ -150,11 +150,11 @@ export function MiseDinnerPlaylist({
           <Calendar className="w-8 h-8" />
         </div>
         <div>
-          <h3 className="text-2xl font-serif font-bold text-white">Your Dinner Playlist</h3>
+          <h3 className="text-2xl font-serif font-bold text-white">The Platelist</h3>
           <p className="text-xs sm:text-sm text-purple-200/70 mt-1.5 leading-relaxed">
             {availableRecipesCount === 0
-              ? 'Add a few favorite recipes to your vault (or import from your Recipeeks cookbooks) to generate a customized 3 to 4 day rotation.'
-              : `You have ${availableRecipesCount} active recipe(s) ready in your vault. Generate your customized dinner rotation.`}
+              ? 'Add a few favorite recipes to your vault (or import from your Recipeeks cookbooks) to generate a customized 3 to 4 day Platelist rotation.'
+              : `You have ${availableRecipesCount} active recipe(s) ready in your vault. Generate your customized Platelist rotation.`}
           </p>
         </div>
 
@@ -173,7 +173,7 @@ export function MiseDinnerPlaylist({
             className="px-6 py-3.5 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-600 hover:from-purple-500 hover:to-purple-400 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-2 mx-auto cursor-pointer transition-all"
           >
             <Sparkles className="w-4 h-4" />
-            <span>{generating ? 'Rolling Playlist...' : 'Generate 3-Day Rotation'}</span>
+            <span>{generating ? 'Rolling Platelist...' : 'Generate 3-Day Platelist'}</span>
           </button>
         )}
       </div>
@@ -201,14 +201,14 @@ export function MiseDinnerPlaylist({
               Active Rotation
             </span>
             <span className="text-xs text-purple-300/70 font-mono">
-              {currentSlots.length}-Day Dinner Playlist · {availableRecipesCount} in vault
+              {currentSlots.length}-Day Platelist · {availableRecipesCount} in vault
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-serif font-bold text-white leading-tight">
-            Dinner Playlist
+            The Platelist
           </h2>
           <p className="text-xs text-purple-200/60 mt-0.5">
-            Your customized rotation for the week, curated from your favorite recipes.
+            Your customized dinner rotation for the week, curated from your favorite recipes.
           </p>
         </div>
 

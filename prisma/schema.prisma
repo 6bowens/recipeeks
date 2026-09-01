@@ -133,14 +133,20 @@ model ScanSession {
 model CustomRecipe {
   id                String                   @id @default(cuid())
   title             String
-  sourceType        String                   @default("manual") // "manual", "url", "cookbook", "google_notes"
+  sourceType        String                   @default("manual") // "manual", "url", "cookbook", "photo_ocr", "ai"
   sourceUrl         String?
   cookbookTitle     String?
   pageNumber        Int?
   frequency         String                   @default("1_week") // "1_week", "2_month", "1_month", "occasional", "paused"
   servings          String?                  @default("2-4")
+  servingsNum       Float?                   @default(4.0)
   prepTime          String?
   cookTime          String?
+  tags              String?                  // comma-separated tags e.g. "Weeknight, Quick, High-Protein"
+  cuisine           String?                  // "Italian", "Mexican", "Asian", "American", etc.
+  mealCategory      String?                  @default("dinner") // "dinner", "lunch", "breakfast", "dessert", "side", "snack"
+  rating            Float?                   @default(5.0)
+  imageUrl          String?
   instructions      String?                  // JSON string array or markdown text
   notes             String?
   userId            String

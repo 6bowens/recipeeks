@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { getGeminiClient, generateWithFallback } from '@/lib/gemini';
 import { deduceAisleCategory, cleanRecipeText, parseIngredientLine } from '@/lib/playlist-utils';
 import { checkUserAiSpend, recordAiSpend } from '@/lib/spend';
+import { parseQuantity } from '@/lib/recipe-scaling';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
     }
 
     const aiPrompt = `You are an elite Michelin-trained executive chef and culinary developer.
-Create a complete, flavorful, practical, and delicious home-cooked dinner recipe based on this description/prompt:
+Create a complete, flavorful, practical, and delicious home-cooked recipe based on this description/prompt:
 "${prompt.trim()}"
 ${style ? `Style / Preference: ${style}` : ''}
 ${cookTime ? `Target Cook Time: ${cookTime}` : ''}
@@ -56,12 +57,13 @@ CRITICAL RULES:
 2. Provide realistic cook time (e.g. "30 mins", "45 mins") and prep time (e.g. "15 mins").
 3. Provide realistic, properly portioned ingredients.
 4. Each ingredient MUST have:
-   - "name": Clean ingredient name (e.g. "boneless skinless chicken thighs", "broccoli florets", "olive oil"). Do NOT include amounts or bullets in the name.
+   - "name": Clean ingredient name (e.g. "boneless skinless chicken thighs", "broccoli florets", "olive oil"). Do NOT include amounts in the name.
    - "amount": Numerical quantity or fraction (e.g. "1.5", "2", "1/2", "3").
-   - "unit": Valid culinary unit (e.g. "lbs", "cups", "tbsp", "tsp", "cloves", "medium", "cans") or empty if countable (e.g. "eggs").
-   - "aisleCategory": Exactly one of "produce", "meat", "dairy", "pantry", "spices", "other".
+   - "unit": Valid culinary unit (e.g. "lbs", "cups", "tbsp", "tsp", "cloves", "medium", "cans") or empty if countable.
+   - "aisleCategory": Exactly one of "produce", "meat", "seafood", "dairy", "pantry", "spices", "bakery", "other".
 5. Provide concise, numbered step-by-step instructions.
-6. Provide a short "notes" string with chef pro-tips or flavor enhancements.
+6. Provide a short "notes" string with chef pro-tips.
+7. Include cuisine (e.g. "Italian", "Mexican", "Asian", "American", etc.), mealCategory ("dinner", "lunch", "breakfast", "dessert", "side", "snack"), and 2-4 tags (e.g. ["Weeknight", "High-Protein"]).
 
 JSON Schema:
 {
@@ -69,6 +71,9 @@ JSON Schema:
   "servings": "4",
   "prepTime": "15 mins",
   "cookTime": "35 mins",
+  "cuisine": "American",
+  "mealCategory": "dinner",
+  "tags": ["Weeknight", "Sheet Pan", "High-Protein"],
   "notes": "Pat chicken skin dry with paper towels before seasoning for maximum crispiness.",
   "ingredients": [
     { "name": "bone-in skin-on chicken thighs", "amount": "2", "unit": "lbs", "aisleCategory": "meat" },
@@ -97,12 +102,17 @@ JSON Schema:
     await recordAiSpend(session.user.id, 'mise_recipe_gen', 0.005, aiPrompt.length);
 
     const parsed = JSON.parse(textResponse);
+    const servingsStr = cleanRecipeText(parsed.servings || servings);
 
     const recipe = {
       title: cleanRecipeText(parsed.title || prompt),
-      servings: cleanRecipeText(parsed.servings || servings),
+      servings: servingsStr,
+      servingsNum: parseQuantity(servingsStr) || 4.0,
       prepTime: parsed.prepTime ? cleanRecipeText(parsed.prepTime) : undefined,
       cookTime: cleanRecipeText(parsed.cookTime || '30 mins'),
+      cuisine: parsed.cuisine ? cleanRecipeText(parsed.cuisine) : undefined,
+      mealCategory: parsed.mealCategory ? cleanRecipeText(parsed.mealCategory) : 'dinner',
+      tags: Array.isArray(parsed.tags) ? parsed.tags.join(', ') : parsed.tags || undefined,
       notes: parsed.notes ? cleanRecipeText(parsed.notes) : undefined,
       sourceType: 'ai_prompt',
       ingredients: (parsed.ingredients || []).map((ing: any) => {
