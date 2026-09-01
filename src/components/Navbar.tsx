@@ -456,8 +456,36 @@ function NavbarContent() {
                           }`}
                         >
                           <Download className="w-4 h-4 text-charcoal-400" />
-                          <span>{isExporting ? 'Exporting...' : 'Export Collection (CSV)'}</span>
+                          <span>{isExporting ? 'Exporting...' : 'Export Recipes (CSV)'}</span>
                         </button>
+
+                        <a
+                          href="/api/admin/backup?format=sqlite"
+                          download
+                          onClick={() => setUserMenuOpen(false)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                            isMise || isCocktails
+                              ? 'hover:bg-white/5 text-purple-300'
+                              : 'hover:bg-charcoal-100 text-charcoal-700'
+                          }`}
+                        >
+                          <Download className="w-4 h-4 text-purple-400" />
+                          <span>Download DB Backup (.db)</span>
+                        </a>
+
+                        <a
+                          href="/api/admin/backup?format=json"
+                          download
+                          onClick={() => setUserMenuOpen(false)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                            isMise || isCocktails
+                              ? 'hover:bg-white/5 text-amber-300'
+                              : 'hover:bg-charcoal-100 text-charcoal-700'
+                          }`}
+                        >
+                          <Download className="w-4 h-4 text-amber-400" />
+                          <span>Export Full JSON Dump</span>
+                        </a>
 
                         <div
                           className={`border-t my-1 ${
