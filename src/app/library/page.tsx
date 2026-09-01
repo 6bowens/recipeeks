@@ -122,28 +122,28 @@ export default function LibraryPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 flex-nowrap overflow-x-auto no-scrollbar w-full sm:w-auto">
           <button
             onClick={() => setShowFavorites(true)}
-            className="flex items-center gap-1.5 px-3 py-2.5 bg-amber-50 hover:bg-amber-100/80 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-2 sm:py-2.5 bg-amber-50 hover:bg-amber-100/80 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
             title="View all starred favourite recipes"
           >
-            <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+            <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-amber-400 text-amber-500" />
             <span>Favourites {favoritesCount > 0 ? `(${favoritesCount})` : ''}</span>
           </button>
           <Link
             href="/scan"
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors whitespace-nowrap"
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-2 sm:py-2.5 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors whitespace-nowrap shrink-0"
           >
-            <Camera className="w-4 h-4" />
-            <span>Scan Bookshelf</span>
+            <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Scan Books</span>
           </Link>
           <Link
             href="/pantry"
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-charcoal-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition-all hover:scale-105 whitespace-nowrap"
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-2 sm:py-2.5 bg-charcoal-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition-all hover:scale-105 whitespace-nowrap shrink-0"
           >
             <span>Update Fridge</span>
-            <ArrowRight className="w-4 h-4 text-red-400" />
+            <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-400" />
           </Link>
         </div>
       </div>
