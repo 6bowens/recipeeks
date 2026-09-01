@@ -4,7 +4,11 @@ import GoogleProvider from 'next-auth/providers/google';
 import bcrypt from 'bcryptjs';
 import { db } from './db';
 
-export const ADMIN_EMAILS = ['6bowens@gmail.com', 'demo@recipeeks.app'];
+export const ADMIN_EMAILS = [
+  '6bowens@gmail.com',
+  'laura.katherine.mcleod@gmail.com',
+  'demo@recipeeks.app',
+];
 
 export function isUserAdmin(email?: string | null): boolean {
   if (!email) return false;
@@ -49,8 +53,8 @@ providers.push(
         where: { email },
       });
 
-      // If user not found by exact email, check if logging in as admin/demo alias or single owner
-      if (!user && (email === '6bowens@gmail.com' || email === 'demo@recipeeks.app' || ADMIN_EMAILS.includes(email))) {
+      // If user not found by exact email, check demo aliases
+      if (!user && email === 'demo@recipeeks.app') {
         user = await db.user.findFirst({
           where: {
             OR: [
@@ -59,24 +63,16 @@ providers.push(
             ],
           },
         });
-
-        // Fallback to the first existing user if only 1 user exists in the system
-        if (!user) {
-          const allUsers = await db.user.findMany({ take: 2 });
-          if (allUsers.length === 1) {
-            user = allUsers[0];
-          }
-        }
       }
 
       if (!user) {
-        // Auto-create account if password provided
+        // Auto-create account if not present
         const hashedPassword = await bcrypt.hash(credentials.password, 10);
         user = await db.user.create({
           data: {
             email,
             password: hashedPassword,
-            name: email.split('@')[0],
+            name: email.includes('laura') ? 'Chef Laura' : email.split('@')[0],
           },
         });
       }
@@ -150,6 +146,34 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: false, // Ensures session cookies work over both HTTP and HTTPS
+      },
+    },
+    callbackUrl: {
+      name: `next-auth.callback-url`,
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: false,
+      },
+    },
+    csrfToken: {
+      name: `next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: false,
+      },
+    },
+  },
   providers,
   callbacks: {
     async signIn({ user, account, profile }) {
@@ -161,23 +185,10 @@ export const authOptions: NextAuthOptions = {
           where: { email },
         });
 
-        // If user not found by exact email, link admin/demo account if applicable
-        if (!existingUser && (email === '6bowens@gmail.com' || email === 'demo@recipeeks.app')) {
-          existingUser = await db.user.findFirst({
-            where: {
-              OR: [
-                { email: '6bowens@gmail.com' },
-                { email: 'demo@recipeeks.app' },
-              ],
-            },
-          });
-        }
-
         if (existingUser) {
           await db.user.update({
             where: { id: existingUser.id },
             data: {
-              email: email, // sync to google email
               googleId: account.providerAccountId,
               googleAccessToken: account.access_token || undefined,
               googleRefreshToken: account.refresh_token || undefined,
@@ -189,7 +200,7 @@ export const authOptions: NextAuthOptions = {
           const newUser = await db.user.create({
             data: {
               email,
-              name: user.name || email.split('@')[0],
+              name: user.name || (email.includes('laura') ? 'Chef Laura' : email.split('@')[0]),
               googleId: account.providerAccountId,
               googleAccessToken: account.access_token,
               googleRefreshToken: account.refresh_token,

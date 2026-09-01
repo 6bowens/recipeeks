@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
-import { ChefHat, Lock, Mail, ArrowRight, Sparkles } from 'lucide-react';
+import { ChefHat, Lock, Mail, ArrowRight, UserCheck } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,8 +38,8 @@ export default function LoginPage() {
     }
   };
 
-  const handleDemoLogin = async () => {
-    setEmail('6bowens@gmail.com');
+  const handleQuickLogin = async (userEmail: string) => {
+    setEmail(userEmail);
     setPassword('demo1234');
     setError(null);
     setLoading(true);
@@ -47,7 +47,7 @@ export default function LoginPage() {
     try {
       const res = await signIn('credentials', {
         redirect: false,
-        email: '6bowens@gmail.com',
+        email: userEmail,
         password: 'demo1234',
       });
 
@@ -84,6 +84,41 @@ export default function LoginPage() {
             {error}
           </div>
         )}
+
+        {/* 1-Click Fast Profile Switcher */}
+        <div className="space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-charcoal-400">
+            Quick Family Sign-In:
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('6bowens@gmail.com')}
+              disabled={loading}
+              className="px-3 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-200/90 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+            >
+              <UserCheck className="w-3.5 h-3.5 text-amber-600" />
+              <span>Brett</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('laura.katherine.mcleod@gmail.com')}
+              disabled={loading}
+              className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-950 border border-rose-200/90 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+            >
+              <UserCheck className="w-3.5 h-3.5 text-rose-600" />
+              <span>Laura</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="relative flex py-1 items-center">
+          <div className="flex-grow border-t border-charcoal-200"></div>
+          <span className="flex-shrink mx-3 text-charcoal-400 text-[10px] uppercase font-bold tracking-wider">
+            Or With Email
+          </span>
+          <div className="flex-grow border-t border-charcoal-200"></div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -123,24 +158,14 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md transition-colors disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
           >
             {loading ? 'Signing in...' : 'Sign In'} <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        {/* Demo Fast Login */}
-        <div className="pt-2 border-t border-charcoal-100 space-y-3">
-          <button
-            type="button"
-            onClick={handleDemoLogin}
-            disabled={loading}
-            className="w-full py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-200/80 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Quick Demo Chef Login
-          </button>
-
-          <p className="text-center text-xs text-charcoal-500">
+        <div className="pt-2 border-t border-charcoal-100 text-center">
+          <p className="text-xs text-charcoal-500">
             Don&apos;t have an account yet?{' '}
             <Link href="/register" className="font-semibold text-amber-700 hover:underline">
               Create an account
