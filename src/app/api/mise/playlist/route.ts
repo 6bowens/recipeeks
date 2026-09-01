@@ -2,9 +2,56 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { generatePlaylistRotation, computeGroceryDelta } from '@/lib/playlist-utils';
+import { generatePlaylistRotation, computeGroceryDelta, cleanRecipeText, deduceAisleCategory } from '@/lib/playlist-utils';
+import { normalizeIngredientName } from '@/lib/utils';
+import { parseQuantity } from '@/lib/recipe-scaling';
 
 export const dynamic = 'force-dynamic';
+
+async function getAllUserRecipes(userId: string) {
+  const custom = await db.customRecipe.findMany({
+    where: { userId },
+    include: { ingredients: true },
+  });
+
+  const cookbookRecipes = await db.recipe.findMany({
+    where: { cookbook: { userId } },
+    include: {
+      cookbook: { select: { id: true, title: true, author: true, coverImageUrl: true } },
+      ingredients: true,
+    },
+  });
+
+  const formattedCookbook = cookbookRecipes.map((r) => ({
+    id: r.id,
+    title: cleanRecipeText(r.title),
+    sourceType: 'cookbook',
+    cookbookId: r.cookbook.id,
+    cookbookTitle: cleanRecipeText(r.cookbook.title),
+    cookbookAuthor: r.cookbook.author ? cleanRecipeText(r.cookbook.author) : null,
+    cookbookCoverUrl: r.cookbook.coverImageUrl,
+    pageNumber: r.pageNumber,
+    frequency: '1_week',
+    servings: r.servings || '4',
+    servingsNum: parseQuantity(r.servings) || 4.0,
+    prepTime: r.prepTime ? cleanRecipeText(r.prepTime) : null,
+    cookTime: r.cookTime ? cleanRecipeText(r.cookTime) : null,
+    mealCategory: (r.category || 'dinner').toLowerCase(),
+    instructions: `Refer to ${r.cookbook.title}${r.pageNumber ? `, page ${r.pageNumber}` : ''}.`,
+    notes: `From ${r.cookbook.title} (p. ${r.pageNumber || 'N/A'})`,
+    ingredients: (r.ingredients || []).map((i) => ({
+      id: i.id,
+      name: cleanRecipeText(i.name),
+      normalizedName: i.normalizedName || normalizeIngredientName(i.name),
+      amount: i.amount ? cleanRecipeText(i.amount) : null,
+      unit: i.unit ? cleanRecipeText(i.unit) : null,
+      aisleCategory: deduceAisleCategory(i.name),
+      optional: !!i.optional,
+    })),
+  }));
+
+  return [...custom, ...formattedCookbook];
+}
 
 export async function GET(req: Request) {
   try {
@@ -15,12 +62,8 @@ export async function GET(req: Request) {
 
     const userId = session.user.id;
 
-    // Fetch user recipes
-    const userRecipes = await db.customRecipe.findMany({
-      where: { userId },
-      include: { ingredients: true },
-    });
-
+    // Fetch unified user recipes (Custom + Cookbooks)
+    const userRecipes = await getAllUserRecipes(userId);
     const activeRecipes = userRecipes.filter((r) => r.frequency !== 'paused');
 
     // Fetch pantry items
@@ -65,7 +108,7 @@ export async function GET(req: Request) {
       } else {
         playlistRecord = await db.mealPlaylist.create({
           data: {
-            name: 'Dinner Rotation',
+            name: 'The Platelist',
             daysCount,
             scheduleJson: JSON.stringify(scheduledSlots),
             active: true,
@@ -81,7 +124,6 @@ export async function GET(req: Request) {
 
     scheduledSlots = scheduledSlots.map((slot) => {
       const r = userRecipes.find((item) => item.id === slot.recipeId);
-      // If recipe doesn't exist or is paused (0x), replace it with an unpaused active recipe
       if (!r || r.frequency === 'paused') {
         slotsChanged = true;
         let pool = activeRecipes.filter((cand) => !currentActiveIds.has(cand.id));
@@ -112,7 +154,6 @@ export async function GET(req: Request) {
     const hydratedSlots = scheduledSlots
       .map((slot) => {
         const r = userRecipes.find((item) => item.id === slot.recipeId);
-        // Strictly exclude any paused recipes
         if (!r || r.frequency === 'paused') return null;
         return {
           day: slot.day,
@@ -156,16 +197,12 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { daysCount = 3, pinnedSlots = [] } = body;
 
-    const userRecipes = await db.customRecipe.findMany({
-      where: { userId },
-      include: { ingredients: true },
-    });
-
+    const userRecipes = await getAllUserRecipes(userId);
     const activeRecipes = userRecipes.filter((r) => r.frequency !== 'paused');
 
     if (activeRecipes.length === 0) {
       return NextResponse.json(
-        { error: 'Please unpause or add recipes to your Mise vault first before generating a playlist.' },
+        { error: 'Please unpause or add recipes to your Mise vault first before generating The Platelist.' },
         { status: 400 }
       );
     }
@@ -177,7 +214,6 @@ export async function POST(req: Request) {
       locked: g.locked,
     }));
 
-    // Update or create active playlist record
     const existing = await db.mealPlaylist.findFirst({
       where: { userId, active: true },
     });
@@ -194,7 +230,7 @@ export async function POST(req: Request) {
     } else {
       playlistRecord = await db.mealPlaylist.create({
         data: {
-          name: 'Dinner Rotation',
+          name: 'The Platelist',
           daysCount,
           scheduleJson: JSON.stringify(scheduleSlots),
           active: true,
@@ -203,7 +239,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // Compute Grocery Delta
     const pantryItems = await db.pantryItem.findMany({ where: { userId } });
     const activePlaylistRecipes = generated.map((g) => g.recipe);
     const groceryDelta = computeGroceryDelta(activePlaylistRecipes, pantryItems);
@@ -235,90 +270,49 @@ export async function PATCH(req: Request) {
 
     const userId = session.user.id;
     const body = await req.json();
-    const { action, day, newRecipeId, toggleLock } = body;
+    const { action, day, recipeId } = body;
 
-    const userRecipes = await db.customRecipe.findMany({
-      where: { userId },
-      include: { ingredients: true },
-    });
-
-    const playlistRecord = await db.mealPlaylist.findFirst({
+    let playlistRecord = await db.mealPlaylist.findFirst({
       where: { userId, active: true },
     });
 
-    if (!playlistRecord) {
+    if (!playlistRecord || !playlistRecord.scheduleJson) {
       return NextResponse.json({ error: 'No active playlist found' }, { status: 404 });
     }
 
-    let scheduledSlots: { day: number; recipeId: string; locked?: boolean }[] = JSON.parse(
-      playlistRecord.scheduleJson || '[]'
+    let slots: { day: number; recipeId: string; locked?: boolean }[] = JSON.parse(
+      playlistRecord.scheduleJson
     );
 
+    const userRecipes = await getAllUserRecipes(userId);
+    const activePool = userRecipes.filter((r) => r.frequency !== 'paused');
+
     if (action === 'swap') {
-      // Find candidate recipes not currently in the playlist and not paused
-      const currentRecipeIds = new Set(scheduledSlots.map((s) => s.recipeId));
-      let pool = userRecipes.filter((r) => !currentRecipeIds.has(r.id) && r.frequency !== 'paused');
-      if (pool.length === 0) {
-        // Fallback: any active unpaused recipe other than the current day's recipe
-        const currentSlot = scheduledSlots.find((s) => s.day === day);
-        pool = userRecipes.filter((r) => r.id !== currentSlot?.recipeId && r.frequency !== 'paused');
+      const currentIds = new Set(slots.map((s) => s.recipeId));
+      let candidates = activePool.filter((r) => !currentIds.has(r.id));
+      if (candidates.length === 0) candidates = activePool;
+
+      if (candidates.length === 0) {
+        return NextResponse.json({ error: 'No replacement recipes available' }, { status: 400 });
       }
 
-      if (pool.length === 0) {
-        return NextResponse.json({ error: 'No other unpaused recipes available to swap.' }, { status: 400 });
-      }
-
-      // Pick random weighted candidate
-      const targetRecipe = newRecipeId
-        ? userRecipes.find((r) => r.id === newRecipeId && r.frequency !== 'paused') || pool[0]
-        : pool[Math.floor(Math.random() * pool.length)];
-
-      scheduledSlots = scheduledSlots.map((s) =>
-        s.day === day ? { ...s, recipeId: targetRecipe.id, locked: false } : s
-      );
-    } else if (action === 'lock') {
-      scheduledSlots = scheduledSlots.map((s) =>
-        s.day === day ? { ...s, locked: toggleLock !== undefined ? toggleLock : !s.locked } : s
-      );
+      const randomPick = candidates[Math.floor(Math.random() * candidates.length)];
+      slots = slots.map((s) => (s.day === day ? { ...s, recipeId: randomPick.id, locked: false } : s));
+    } else if (action === 'toggle_lock') {
+      slots = slots.map((s) => (s.day === day ? { ...s, locked: !s.locked } : s));
+    } else if (action === 'add_recipe' && recipeId) {
+      const nextDay = slots.length + 1;
+      slots.push({ day: nextDay, recipeId, locked: true });
     }
 
     await db.mealPlaylist.update({
       where: { id: playlistRecord.id },
-      data: {
-        scheduleJson: JSON.stringify(scheduledSlots),
-      },
+      data: { scheduleJson: JSON.stringify(slots) },
     });
 
-    // Hydrate & recompute grocery delta
-    const hydratedSlots = scheduledSlots
-      .map((slot) => {
-        const r = userRecipes.find((item) => item.id === slot.recipeId);
-        if (!r || r.frequency === 'paused') return null;
-        return {
-          day: slot.day,
-          locked: !!slot.locked,
-          recipe: r,
-        };
-      })
-      .filter((slot): slot is { day: number; locked: boolean; recipe: any } => slot !== null);
-
-    const pantryItems = await db.pantryItem.findMany({ where: { userId } });
-    const groceryDelta = computeGroceryDelta(
-      hydratedSlots.map((s) => s.recipe),
-      pantryItems
-    );
-
-    return NextResponse.json({
-      success: true,
-      playlist: {
-        id: playlistRecord.id,
-        daysCount: playlistRecord.daysCount,
-        slots: hydratedSlots,
-      },
-      groceryDelta,
-    });
+    return NextResponse.json({ success: true, slots });
   } catch (err) {
-    console.error('Update playlist slot error:', err);
+    console.error('Update playlist error:', err);
     return NextResponse.json(
       { error: 'Failed to update playlist: ' + (err as Error).message },
       { status: 500 }

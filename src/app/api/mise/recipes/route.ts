@@ -20,10 +20,12 @@ export async function GET(req: Request) {
     const q = searchParams.get('q')?.toLowerCase().trim();
     const mealCategory = searchParams.get('category');
     const frequency = searchParams.get('frequency');
+    const sourceFilter = searchParams.get('source'); // 'all', 'cookbook', 'custom'
     const tag = searchParams.get('tag')?.toLowerCase().trim();
     const favoritesOnly = searchParams.get('favoritesOnly') === 'true';
 
-    const recipes = await db.customRecipe.findMany({
+    // 1. Fetch Custom Recipes
+    const customRecipes = await db.customRecipe.findMany({
       where: {
         userId,
         ...(mealCategory && mealCategory !== 'all' ? { mealCategory } : {}),
@@ -38,8 +40,26 @@ export async function GET(req: Request) {
       orderBy: { createdAt: 'desc' },
     });
 
-    let cleanedRecipes = recipes.map((r) => {
-      const isFavorite = (r.favorites && r.favorites.length > 0);
+    // 2. Fetch Physical Cookbook Recipes
+    const cookbookRecipes = await db.recipe.findMany({
+      where: {
+        cookbook: { userId },
+      },
+      include: {
+        cookbook: {
+          select: { id: true, title: true, author: true, coverImageUrl: true, coverColor: true },
+        },
+        ingredients: true,
+        favorites: {
+          where: { userId },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Clean and normalize Custom Recipes
+    const cleanedCustom = customRecipes.map((r) => {
+      const isFavorite = r.favorites && r.favorites.length > 0;
       const tagsList = r.tags
         ? r.tags.split(',').map((t) => t.trim()).filter(Boolean)
         : [];
@@ -69,37 +89,123 @@ export async function GET(req: Request) {
             name,
             amount,
             unit,
+            aisleCategory: i.aisleCategory || deduceAisleCategory(name),
           };
         }),
       };
     });
 
-    // In-memory filter for search query and tag
+    // Clean and format Cookbook Recipes into unified shape
+    const cleanedCookbook = cookbookRecipes.map((r) => {
+      const isFavorite = r.favorites && r.favorites.length > 0;
+      const servingsStr = r.servings || '4';
+
+      return {
+        id: r.id,
+        title: cleanRecipeText(r.title),
+        sourceType: 'cookbook',
+        cookbookId: r.cookbook.id,
+        cookbookTitle: cleanRecipeText(r.cookbook.title),
+        cookbookAuthor: r.cookbook.author ? cleanRecipeText(r.cookbook.author) : null,
+        cookbookCoverUrl: r.cookbook.coverImageUrl,
+        cookbookCoverColor: r.cookbook.coverColor,
+        pageNumber: r.pageNumber,
+        frequency: '1_week',
+        servings: servingsStr,
+        servingsNum: parseQuantity(servingsStr) || 4.0,
+        prepTime: r.prepTime ? cleanRecipeText(r.prepTime) : null,
+        cookTime: r.cookTime ? cleanRecipeText(r.cookTime) : null,
+        tags: null,
+        tagsList: [r.cookbook.title],
+        cuisine: null,
+        mealCategory: (r.category || 'dinner').toLowerCase(),
+        rating: 5.0,
+        imageUrl: r.cookbook.coverImageUrl,
+        instructions: `Refer to ${r.cookbook.title}${r.pageNumber ? `, page ${r.pageNumber}` : ''} for the full preparation steps and culinary guide.`,
+        notes: `From ${r.cookbook.title}${r.cookbook.author ? ` by ${r.cookbook.author}` : ''} (p. ${r.pageNumber || 'N/A'})`,
+        userId,
+        isFavorite,
+        ingredients: (r.ingredients || []).map((i) => {
+          let name = cleanRecipeText(i.name);
+          let amount = i.amount ? cleanRecipeText(i.amount) : null;
+          let unit = i.unit ? cleanRecipeText(i.unit) : null;
+
+          if (!amount && name) {
+            const parsed = parseIngredientLine(name);
+            if (parsed.amount) {
+              amount = parsed.amount;
+              unit = parsed.unit || null;
+              name = parsed.name;
+            }
+          }
+
+          return {
+            id: i.id,
+            recipeId: r.id,
+            name,
+            normalizedName: i.normalizedName || normalizeIngredientName(name),
+            amount,
+            unit,
+            aisleCategory: deduceAisleCategory(name),
+            optional: !!i.optional,
+          };
+        }),
+      };
+    });
+
+    // Merge both sources
+    let allRecipes = [...cleanedCustom, ...cleanedCookbook];
+
+    // Source filter
+    if (sourceFilter === 'cookbook') {
+      allRecipes = allRecipes.filter((r) => r.sourceType === 'cookbook');
+    } else if (sourceFilter === 'custom') {
+      allRecipes = allRecipes.filter((r) => r.sourceType !== 'cookbook');
+    }
+
+    // Category filter
+    if (mealCategory && mealCategory !== 'all') {
+      allRecipes = allRecipes.filter(
+        (r) => (r.mealCategory || 'dinner').toLowerCase() === mealCategory.toLowerCase()
+      );
+    }
+
+    // Frequency filter
+    if (frequency && frequency !== 'all') {
+      allRecipes = allRecipes.filter((r) => r.frequency === frequency);
+    }
+
+    // Search query
     if (q) {
-      cleanedRecipes = cleanedRecipes.filter((r) => {
+      allRecipes = allRecipes.filter((r) => {
         const titleMatch = r.title.toLowerCase().includes(q);
         const notesMatch = r.notes?.toLowerCase().includes(q);
         const cuisineMatch = r.cuisine?.toLowerCase().includes(q);
+        const bookMatch = r.cookbookTitle?.toLowerCase().includes(q);
         const tagMatch = r.tagsList.some((t: string) => t.toLowerCase().includes(q));
         const ingMatch = r.ingredients.some((i: any) => i.name.toLowerCase().includes(q));
-        return titleMatch || notesMatch || cuisineMatch || tagMatch || ingMatch;
+        return titleMatch || notesMatch || cuisineMatch || bookMatch || tagMatch || ingMatch;
       });
     }
 
+    // Tag filter
     if (tag) {
-      cleanedRecipes = cleanedRecipes.filter((r) =>
+      allRecipes = allRecipes.filter((r) =>
         r.tagsList.some((t: string) => t.toLowerCase() === tag)
       );
     }
 
+    // Favorites filter
     if (favoritesOnly) {
-      cleanedRecipes = cleanedRecipes.filter((r) => r.isFavorite);
+      allRecipes = allRecipes.filter((r) => r.isFavorite);
     }
 
     return NextResponse.json({
       success: true,
-      recipes: cleanedRecipes,
-      count: cleanedRecipes.length,
+      recipes: allRecipes,
+      customCount: cleanedCustom.length,
+      cookbookCount: cleanedCookbook.length,
+      count: allRecipes.length,
     });
   } catch (err) {
     console.error('Fetch recipes error:', err);
@@ -331,46 +437,6 @@ export async function PATCH(req: Request) {
         await db.customRecipeIngredient.createMany({
           data: newIngredients,
         });
-      }
-    }
-
-    if (frequency === 'paused') {
-      const activePlaylist = await db.mealPlaylist.findFirst({
-        where: { userId, active: true },
-      });
-
-      if (activePlaylist?.scheduleJson) {
-        try {
-          const slots: { day: number; recipeId: string; locked?: boolean }[] = JSON.parse(
-            activePlaylist.scheduleJson
-          );
-          const needsSwap = slots.some((s) => s.recipeId === id);
-          if (needsSwap) {
-            const allRecipes = await db.customRecipe.findMany({
-              where: { userId },
-            });
-            const activePool = allRecipes.filter((r) => r.id !== id && r.frequency !== 'paused');
-            const currentIds = new Set(slots.map((s) => s.recipeId));
-
-            const updatedSlots = slots.map((s) => {
-              if (s.recipeId === id) {
-                let pool = activePool.filter((cand) => !currentIds.has(cand.id));
-                if (pool.length === 0) pool = activePool;
-                if (pool.length > 0) {
-                  const replacement = pool[Math.floor(Math.random() * pool.length)];
-                  currentIds.add(replacement.id);
-                  return { ...s, recipeId: replacement.id, locked: false };
-                }
-              }
-              return s;
-            });
-
-            await db.mealPlaylist.update({
-              where: { id: activePlaylist.id },
-              data: { scheduleJson: JSON.stringify(updatedSlots) },
-            });
-          }
-        } catch (e) {}
       }
     }
 
