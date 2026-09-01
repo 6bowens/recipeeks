@@ -125,7 +125,7 @@ export default function LibraryPage() {
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <button
             onClick={() => setShowFavorites(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100/80 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-amber-50 hover:bg-amber-100/80 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
             title="View all starred favourite recipes"
           >
             <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
@@ -133,15 +133,16 @@ export default function LibraryPage() {
           </button>
           <Link
             href="/scan"
-            className="flex items-center gap-2 px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors whitespace-nowrap"
           >
-            <Camera className="w-4 h-4" /> Scan Bookshelf
+            <Camera className="w-4 h-4" />
+            <span>Scan Bookshelf</span>
           </Link>
           <Link
             href="/pantry"
-            className="flex items-center gap-2 px-4 py-2.5 bg-charcoal-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition-all hover:scale-105"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-charcoal-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition-all hover:scale-105 whitespace-nowrap"
           >
-            <span>Next: Update Fridge</span>
+            <span>Update Fridge</span>
             <ArrowRight className="w-4 h-4 text-red-400" />
           </Link>
         </div>
