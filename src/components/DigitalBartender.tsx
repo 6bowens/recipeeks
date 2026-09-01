@@ -416,7 +416,7 @@ export function DigitalBartender() {
         <div className="relative z-10 shrink-0 flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setShowFavorites(true)}
-            className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 hover:text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer active:scale-95"
+            className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 hover:text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
             title="View all starred favourite cocktails"
           >
             <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
@@ -425,24 +425,15 @@ export function DigitalBartender() {
 
           <Link
             href="/cocktails?tab=menus"
-            className="px-3.5 py-2 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-200 hover:text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95"
-            title="Browse all local restaurant favourites"
+            className="px-3.5 py-2 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-200 hover:text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 whitespace-nowrap"
+            title="Browse local restaurant and bar menus"
           >
             <Building2 className="w-3.5 h-3.5 text-rose-400" />
-            <span>Local Faves</span>
+            <span>Local Menus</span>
           </Link>
 
-          <button
-            onClick={() => setShowMenuScanModal(true)}
-            className="px-3.5 py-2 bg-gradient-to-r from-amber-600/40 to-amber-700/40 hover:from-amber-600/60 hover:to-amber-700/60 border border-amber-500/40 text-amber-200 hover:text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95"
-            title="Scan a restaurant cocktail menu to import drinks globally"
-          >
-            <Camera className="w-3.5 h-3.5 text-amber-400" />
-            <span>Scan Menu</span>
-          </button>
-
           {step < 4 ? (
-            <div className="flex items-center gap-2 bg-[#0d0f14] border border-amber-900/40 px-3.5 py-2 rounded-2xl text-xs">
+            <div className="flex items-center gap-2 bg-[#0d0f14] border border-amber-900/40 px-3.5 py-2 rounded-2xl text-xs whitespace-nowrap">
               <span className={step >= 1 ? 'text-amber-400 font-bold' : 'text-charcoal-500'}>1. Spirit</span>
               <ChevronRight className="w-3 h-3 text-charcoal-600" />
               <span className={step >= 2 ? 'text-amber-400 font-bold' : 'text-charcoal-500'}>2. Flavor</span>
@@ -452,7 +443,7 @@ export function DigitalBartender() {
           ) : (
             <button
               onClick={resetWizard}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl font-semibold text-xs flex items-center gap-2 backdrop-blur-md transition-all cursor-pointer shadow-md"
+              className="px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl font-semibold text-xs flex items-center gap-2 backdrop-blur-md transition-all cursor-pointer shadow-md whitespace-nowrap"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Start Over</span>

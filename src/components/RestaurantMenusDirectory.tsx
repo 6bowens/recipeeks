@@ -242,7 +242,7 @@ export function RestaurantMenusDirectory() {
       <div className="bg-gradient-to-r from-[#1c1214] via-[#140e10] to-[#241318] border border-amber-900/40 rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div>
           <h2 className="text-2xl sm:text-3xl font-serif font-bold text-white leading-tight flex items-center gap-2.5">
-            <Building2 className="w-7 h-7 text-amber-400" /> Local Faves
+            <Building2 className="w-7 h-7 text-amber-400" /> Local Menus
           </h2>
         </div>
 

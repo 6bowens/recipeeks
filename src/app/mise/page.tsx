@@ -164,10 +164,10 @@ function MiseContent() {
           <Link
             href="/restaurant-menus"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 text-amber-200 hover:text-white text-xs font-bold transition-all shadow-md active:scale-95"
-            title="Browse and scan restaurant menus in Local Faves"
+            title="Browse and scan restaurant & bar menus in Local Menus"
           >
             <Building2 className="w-3.5 h-3.5 text-amber-400" />
-            <span>Local Faves ↗</span>
+            <span>Local Menus ↗</span>
           </Link>
         </div>
       </div>

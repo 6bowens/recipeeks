@@ -71,7 +71,7 @@ function NavbarContent() {
     {
       href: '/cocktails?tab=menus',
       tabId: 'menus',
-      label: 'Local Faves',
+      label: 'Local Menus',
       icon: Building2,
     },
   ];
